@@ -55,7 +55,11 @@ def run_simulation(settings, current_year=None, current_month=None):
     annual_inflation = market["inflation"] / 100.0
 
     n_sim = settings.get("sim_count", 5000)
-    initial_asset = settings.get("current_asset", 0)
+
+    # 初期資産（運用済み / 現金・待機資金の分離）
+    initial_invested = settings.get("invested_asset", settings.get("current_asset", 0))
+    initial_cash = settings.get("cash_reserve", 0)
+    initial_total = initial_invested + initial_cash
 
     # シミュレーション期間: 60年間（月単位）
     n_years = 60
@@ -72,26 +76,36 @@ def run_simulation(settings, current_year=None, current_month=None):
         m = (current_month - 1 + i) % 12 + 1
         months_axis.append((y, m))
 
-    # --- 積立・取崩・年金スケジュール構築（月単位） ---
-    contributions_schedule = np.zeros(n_months)
+    # --- ヘルパー: 期間スケジュールビルダー ---
+    def _build_schedule(entries, key="monthly"):
+        """期間指定エントリのリストから月次スケジュールを構築する。"""
+        schedule = np.zeros(n_months)
+        for entry in entries:
+            start_y, start_m = parse_ym(entry.get("start_ym", ""))
+            end_y, end_m = parse_ym(entry.get("end_ym", ""))
+            if start_y is None or end_y is None:
+                continue
+            for month_idx in range(n_months):
+                y, m = months_axis[month_idx]
+                if (y > start_y or (y == start_y and m >= start_m)) and \
+                   (y < end_y or (y == end_y and m <= end_m)):
+                    schedule[month_idx] += entry.get(key, 0)
+        return schedule
+
+    # --- 各種スケジュール構築（月単位） ---
+    # 貯金スケジュール（収入-支出の余剰 → 現金プールへ）
+    savings_schedule = _build_schedule(settings.get("savings", []))
+
+    # 振替スケジュール（現金プール → 運用資産へ）
+    transfer_schedule = _build_schedule(settings.get("transfer_to_investment", []))
+
+    # 積立スケジュール（外部から運用資産へ直接積立、従来互換）
+    contributions_schedule = _build_schedule(settings.get("contributions", []))
+
+    # 取崩スケジュール
     withdrawals_schedule = np.zeros(n_months)
     withdrawal_rates = np.zeros(n_months)
     withdrawal_is_rate = np.zeros(n_months, dtype=bool)
-    pension_schedule = np.zeros(n_months)
-
-    # 積立スケジュール
-    for c in settings.get("contributions", []):
-        start_y, start_m = parse_ym(c.get("start_ym", ""))
-        end_y, end_m = parse_ym(c.get("end_ym", ""))
-        if start_y is None or end_y is None:
-            continue
-        for month_idx in range(n_months):
-            y, m = months_axis[month_idx]
-            if (y > start_y or (y == start_y and m >= start_m)) and \
-               (y < end_y or (y == end_y and m <= end_m)):
-                contributions_schedule[month_idx] += c.get("monthly", 0)
-
-    # 取崩スケジュール
     for w in settings.get("withdrawals", []):
         start_y, start_m = parse_ym(w.get("start_ym", ""))
         end_y, end_m = parse_ym(w.get("end_ym", ""))
@@ -108,6 +122,7 @@ def run_simulation(settings, current_year=None, current_month=None):
                     withdrawal_rates[month_idx] += w.get("value", 0) / 100.0 / 12.0
 
     # 年金スケジュール
+    pension_schedule = np.zeros(n_months)
     pension = settings.get("pension", {})
     pension_start_age = pension.get("start_age", 65)
     self_pension = pension.get("self_monthly", 0)
@@ -207,11 +222,16 @@ def run_simulation(settings, current_year=None, current_month=None):
                     monthly_crash = crash_drop / crash_remaining if crash_remaining > 0 else 0
                     random_returns[sim, start_m:end_m] = -monthly_crash
 
-    # --- 資産パスの計算 ---
+    # --- 資産パスの計算（運用資産 + 現金プール分離） ---
+    invested_paths = np.zeros((n_sim, n_months + 1))
+    cash_paths = np.zeros((n_sim, n_months + 1))
     all_paths = np.zeros((n_sim, n_months + 1))
-    all_paths[:, 0] = initial_asset
 
-    yearly_base = np.full(n_sim, float(initial_asset))
+    invested_paths[:, 0] = initial_invested
+    cash_paths[:, 0] = initial_cash
+    all_paths[:, 0] = initial_total
+
+    yearly_base = np.full(n_sim, float(initial_invested))
 
     for t in range(n_months):
         returns = random_returns[:, t]
@@ -219,7 +239,7 @@ def run_simulation(settings, current_year=None, current_month=None):
 
         # 年初に基準資産を更新（定率取崩用）
         if m == 1:
-            yearly_base = all_paths[:, t].copy()
+            yearly_base = invested_paths[:, t].copy()
 
         # 定率取崩の計算
         if withdrawal_is_rate[t]:
@@ -227,28 +247,48 @@ def run_simulation(settings, current_year=None, current_month=None):
         else:
             actual_withdrawal = withdrawals_schedule[t]
 
-        all_paths[:, t + 1] = (
-            all_paths[:, t] * (1 + returns)
+        # --- 現金プールの更新 ---
+        # 現金プール += 貯金 - 振替額
+        raw_cash = cash_paths[:, t] + savings_schedule[t] - transfer_schedule[t]
+
+        # 現金がマイナスになる場合: 振替額を制限
+        # 実際の振替 = min(設定振替額, 現金残高 + 貯金額)
+        available_for_transfer = np.maximum(cash_paths[:, t] + savings_schedule[t], 0)
+        actual_transfer = np.where(
+            raw_cash < 0,
+            available_for_transfer,  # 現金不足時 → 振替可能な分だけ
+            transfer_schedule[t]     # 現金十分時 → 設定通り
+        )
+        cash_paths[:, t + 1] = np.maximum(
+            cash_paths[:, t] + savings_schedule[t] - actual_transfer, 0
+        )
+
+        # --- 運用資産の更新 ---
+        # 運用資産 = 前月運用 × (1 + リターン) + 振替 + 積立 - 取崩 + 年金
+        invested_paths[:, t + 1] = (
+            invested_paths[:, t] * (1 + returns)
+            + actual_transfer
             + contributions_schedule[t]
             - actual_withdrawal
             + pension_schedule[t]
         )
 
-        # 注: 資産がマイナスになってもクランプしない（成功判定に影響するため）
+        # 合計資産 = 運用 + 現金
+        all_paths[:, t + 1] = invested_paths[:, t + 1] + cash_paths[:, t + 1]
 
-    # --- 年次データに集約（年末 = 12月の値）---
+        # 注: 運用資産がマイナスになってもクランプしない（成功判定に影響するため）
+
+    # --- 年次データに集約 ---
     years = np.arange(current_year, current_year + n_years + 1)
 
-    # 年初（1月）時点の値を取得
+    # 年初時点の値を取得
     yearly_indices = []
     for yr in years:
-        # 各年の1月に対応するインデックスを探す
-        for i, (y, m) in enumerate(months_axis):
-            if y == yr and m == current_month:
+        for i, (y, m_) in enumerate(months_axis):
+            if y == yr and m_ == current_month:
                 yearly_indices.append(i)
                 break
         else:
-            # 見つからなければ最後のインデックス
             if yearly_indices:
                 yearly_indices.append(min(yearly_indices[-1] + 12, n_months))
             else:
@@ -269,8 +309,7 @@ def run_simulation(settings, current_year=None, current_month=None):
     p90 = np.percentile(yearly_paths, 90, axis=0)
     p5 = np.percentile(yearly_paths, 5, axis=0)
 
-    # 成功判定（最終資産が0超の試行 = 最後まで資産が残った）
-    # マイナス残高もそのまま保持するため、正確に枯渇を検出できる
+    # 成功判定（最終合計資産が0超の試行 = 最後まで資産が残った）
     final_assets = all_paths[:, -1]
     success_count = np.sum(final_assets > 0)
     success_rate = success_count / n_sim * 100.0
@@ -286,23 +325,32 @@ def run_simulation(settings, current_year=None, current_month=None):
     compound_curves = {}
     for rate in compound_rates:
         curve = np.zeros(len(years))
-        curve[0] = initial_asset
+        curve[0] = initial_total
         for i in range(1, len(years)):
             yr = years[i]
-            monthly_contribution = 0
+            # 積立 + 振替を含めた全入金を合算
+            monthly_inflow = 0
             for c in settings.get("contributions", []):
                 cy, cm = parse_ym(c.get("start_ym", ""))
                 ey, em = parse_ym(c.get("end_ym", ""))
                 if cy is not None and ey is not None:
                     if cy <= yr <= ey:
-                        monthly_contribution += c.get("monthly", 0)
-            curve[i] = curve[i - 1] * (1 + rate) + monthly_contribution * 12
+                        monthly_inflow += c.get("monthly", 0)
+            for s in settings.get("savings", []):
+                sy, sm = parse_ym(s.get("start_ym", ""))
+                sey, sem = parse_ym(s.get("end_ym", ""))
+                if sy is not None and sey is not None:
+                    if sy <= yr <= sey:
+                        monthly_inflow += s.get("monthly", 0)
+            curve[i] = curve[i - 1] * (1 + rate) + monthly_inflow * 12
         compound_curves[f"{int(rate*100)}%"] = curve
 
     return {
         "years": years,
         "months_axis": months_axis,
         "all_paths": all_paths,
+        "invested_paths": invested_paths,
+        "cash_paths": cash_paths,
         "yearly_paths": yearly_paths,
         "median": median,
         "p10": p10,
@@ -314,4 +362,6 @@ def run_simulation(settings, current_year=None, current_month=None):
         "final_p10": final_p10,
         "final_p5": final_p5,
         "compound_curves": compound_curves,
+        "initial_invested": initial_invested,
+        "initial_cash": initial_cash,
     }

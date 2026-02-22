@@ -30,6 +30,22 @@ def get_default_settings():
                 "volatility": 15.0,
                 "inflation": 1.0,
             },
+            "invested_asset": 3500,
+            "cash_reserve": 1500,
+            "savings": [
+                {
+                    "start_ym": "2026/01",
+                    "end_ym": "2040/12",
+                    "monthly": 10,
+                }
+            ],
+            "transfer_to_investment": [
+                {
+                    "start_ym": "2026/01",
+                    "end_ym": "2035/12",
+                    "monthly": 20,
+                }
+            ],
             "contributions": [
                 {
                     "start_ym": "2025/04",
@@ -63,7 +79,6 @@ def get_default_settings():
             },
             "targets": [5000, 10000],
             "sim_count": 5000,
-            "current_asset": 3000,
         },
         "actual_data": [],
     }
@@ -103,14 +118,23 @@ def load_data():
 
 def _migrate_to_monthly(data):
     """旧形式（start_year/end_year）を新形式（start_ym/end_ym）にマイグレーション。"""
-    for c in data.get("settings", {}).get("contributions", []):
+    settings = data.get("settings", {})
+    for c in settings.get("contributions", []):
         if "start_year" in c and "start_ym" not in c:
             c["start_ym"] = f"{c.pop('start_year')}/01"
             c["end_ym"] = f"{c.pop('end_year')}/12"
-    for w in data.get("settings", {}).get("withdrawals", []):
+    for w in settings.get("withdrawals", []):
         if "start_year" in w and "start_ym" not in w:
             w["start_ym"] = f"{w.pop('start_year')}/01"
             w["end_ym"] = f"{w.pop('end_year')}/12"
+    # 旧current_assetからの移行
+    if "current_asset" in settings and "invested_asset" not in settings:
+        settings["invested_asset"] = settings.pop("current_asset")
+        settings["cash_reserve"] = 0
+    if "savings" not in settings:
+        settings["savings"] = []
+    if "transfer_to_investment" not in settings:
+        settings["transfer_to_investment"] = []
     return data
 
 

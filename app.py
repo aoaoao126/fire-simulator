@@ -362,16 +362,130 @@ with st.sidebar:
     st.divider()
 
     # ==========================================================
-    # 💰 現在の資産
+    # 💰 資産内訳
     # ==========================================================
-    section_header("💰 現在の資産")
-    settings["current_asset"] = st.number_input(
-        "現在の総資産（万円）",
-        min_value=0, max_value=100000,
-        value=int(settings.get("current_asset", 3000)),
-        step=100,
-        help="現在の投資資産の合計額（万円単位）",
-    )
+    section_header("💰 資産内訳")
+
+    cols_asset = st.columns(2)
+    with cols_asset[0]:
+        settings["invested_asset"] = st.number_input(
+            "運用済み資産（万円）",
+            min_value=0, max_value=100000,
+            value=int(settings.get("invested_asset", settings.get("current_asset", 3500))),
+            step=100,
+            help="すでに市場で運用されている金額",
+        )
+    with cols_asset[1]:
+        settings["cash_reserve"] = st.number_input(
+            "現金・待機資金（万円）",
+            min_value=0, max_value=100000,
+            value=int(settings.get("cash_reserve", 0)),
+            step=100,
+            help="銀行預金など、まだ運用に回していない金額",
+        )
+
+    total_asset = settings["invested_asset"] + settings["cash_reserve"]
+    st.caption(f"📊 合計資産: **{total_asset:,} 万円**（運用 {settings['invested_asset']:,} + 現金 {settings['cash_reserve']:,}）")
+
+    st.divider()
+
+    # ==========================================================
+    # 💵 毎月の貯金額（収入-支出の余剰）
+    # ==========================================================
+    section_header("💵 毎月の貯金額")
+    st.caption("収入 − 支出 の余剰分。現金プールに加算されます。")
+
+    savings = settings.get("savings", [])
+
+    for i, s in enumerate(savings):
+        with st.container():
+            st.markdown(f'<div class="phase-card">', unsafe_allow_html=True)
+            cols = st.columns([2, 2, 1.5, 0.5])
+            with cols[0]:
+                s["start_ym"] = st.text_input(
+                    "開始年月", value=s.get("start_ym", "2026/01"),
+                    key=f"ss_{i}", placeholder="YYYY/MM",
+                )
+            with cols[1]:
+                s["end_ym"] = st.text_input(
+                    "終了年月", value=s.get("end_ym", "2040/12"),
+                    key=f"se_{i}", placeholder="YYYY/MM",
+                )
+            with cols[2]:
+                s["monthly"] = st.number_input(
+                    "月額（万円）", min_value=0, max_value=1000,
+                    value=int(s.get("monthly", 10)),
+                    key=f"sm_{i}", step=1,
+                )
+            with cols[3]:
+                if st.button("✕", key=f"sdel_{i}"):
+                    savings.pop(i)
+                    st.rerun()
+
+            # 年齢表示
+            self_member = next((m for m in family if m.get("relation") == "本人"), None)
+            if self_member:
+                s_age = format_age(self_member["birth_date"], *parse_ym(s.get("start_ym", "")))
+                e_age = format_age(self_member["birth_date"], *parse_ym(s.get("end_ym", "")))
+                st.caption(f"開始: {s_age} 〜 終了: {e_age}")
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.button("＋ 貯金行を追加", key="add_savings"):
+        savings.append({"start_ym": "2026/01", "end_ym": "2040/12", "monthly": 10})
+        st.rerun()
+
+    settings["savings"] = savings
+
+    st.divider()
+
+    # ==========================================================
+    # 🔄 投資への振替額
+    # ==========================================================
+    section_header("🔄 投資への振替額")
+    st.caption("現金プールから運用資産への月額振替。現金が底をつくと自動的に停止します。")
+
+    transfers = settings.get("transfer_to_investment", [])
+
+    for i, tr in enumerate(transfers):
+        with st.container():
+            st.markdown(f'<div class="phase-card">', unsafe_allow_html=True)
+            cols = st.columns([2, 2, 1.5, 0.5])
+            with cols[0]:
+                tr["start_ym"] = st.text_input(
+                    "開始年月", value=tr.get("start_ym", "2026/01"),
+                    key=f"ts_{i}", placeholder="YYYY/MM",
+                )
+            with cols[1]:
+                tr["end_ym"] = st.text_input(
+                    "終了年月", value=tr.get("end_ym", "2035/12"),
+                    key=f"te_{i}", placeholder="YYYY/MM",
+                )
+            with cols[2]:
+                tr["monthly"] = st.number_input(
+                    "月額（万円）", min_value=0, max_value=1000,
+                    value=int(tr.get("monthly", 20)),
+                    key=f"tm_{i}", step=1,
+                )
+            with cols[3]:
+                if st.button("✕", key=f"tdel_{i}"):
+                    transfers.pop(i)
+                    st.rerun()
+
+            # 年齢表示
+            self_member = next((m for m in family if m.get("relation") == "本人"), None)
+            if self_member:
+                s_age = format_age(self_member["birth_date"], *parse_ym(tr.get("start_ym", "")))
+                e_age = format_age(self_member["birth_date"], *parse_ym(tr.get("end_ym", "")))
+                st.caption(f"開始: {s_age} 〜 終了: {e_age}")
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.button("＋ 振替行を追加", key="add_transfer"):
+        transfers.append({"start_ym": "2026/01", "end_ym": "2035/12", "monthly": 20})
+        st.rerun()
+
+    settings["transfer_to_investment"] = transfers
 
     st.divider()
 
@@ -781,11 +895,13 @@ with col_btn:
     )
 
 with col_info:
+    invested = settings.get('invested_asset', settings.get('current_asset', 0))
+    cash_res = settings.get('cash_reserve', 0)
     st.caption(
         f"試行回数: {settings.get('sim_count', 5000):,}回 | "
         f"リターン: {settings['market']['return_rate']}% | "
         f"ボラティリティ: {settings['market']['volatility']}% | "
-        f"現在資産: {format_man_yen(settings.get('current_asset', 0))}万円"
+        f"運用: {invested:,}万円 / 現金: {cash_res:,}万円"
     )
 
 # 実行
