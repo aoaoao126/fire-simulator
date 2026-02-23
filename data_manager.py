@@ -110,21 +110,7 @@ def load_data():
                 data["actual_data"] = []
             
             # 実績データを日付順にソート（旧形式の混在や順序不正を解消）
-            def _get_sort_key(entry):
-                d = entry.get("date", "")
-                for sep in ["-", "/"]:
-                    if sep in d:
-                        try:
-                            parts = d.split(sep)
-                            return int(parts[0]) * 12 + (int(parts[1]) if len(parts) > 1 else 1)
-                        except ValueError:
-                            continue
-                try:
-                    return int(d[:4]) * 12
-                except ValueError:
-                    return 0
-            
-            data["actual_data"].sort(key=_get_sort_key)
+            data["actual_data"].sort(key=get_sort_key)
             
             # 旧フォーマット（年単位）からのマイグレーション
             data = _migrate_to_monthly(data)
@@ -187,22 +173,29 @@ def add_actual_data(data, date_str, amount):
             return data
     data["actual_data"].append({"date": date_str, "amount": amount})
     
-    def _get_sort_key(entry):
-        d = entry.get("date", "")
-        for sep in ["-", "/"]:
-            if sep in d:
-                try:
-                    parts = d.split(sep)
-                    return int(parts[0]) * 12 + (int(parts[1]) if len(parts) > 1 else 1)
-                except ValueError:
-                    continue
-        try:
-            return int(d[:4]) * 12
-        except ValueError:
-            return 0
-
-    data["actual_data"].sort(key=_get_sort_key)
+    data["actual_data"].sort(key=get_sort_key)
     return data
+
+
+def get_sort_key(entry):
+    """
+    実績データのソート用キーを返す。
+    日付文字列 (YYYY-MM or YYYY/MM) を月単位の数値インデックスに変換する。
+    """
+    d = entry.get("date", "")
+    for sep in ["-", "/"]:
+        if sep in d:
+            try:
+                parts = d.split(sep)
+                # 年 * 12 + 月
+                return int(parts[0]) * 12 + (int(parts[1]) if len(parts) > 1 else 1)
+            except ValueError:
+                continue
+    try:
+        # 西暦のみの場合
+        return int(d[:4]) * 12
+    except (ValueError, IndexError):
+        return 0
 
 
 def remove_actual_data(data, date_str):

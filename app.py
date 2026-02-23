@@ -15,6 +15,7 @@ from data_manager import (
     load_data, save_data, get_default_settings,
     add_actual_data, remove_actual_data,
     export_data_json, import_data_json,
+    get_sort_key,
     calc_age, format_age, format_man_yen,
     parse_ym, get_fire_start_ym, get_pension_start_year,
 )
@@ -806,7 +807,7 @@ with st.sidebar:
         st.caption("📋 記録済みデータ (最新5件):")
         
         # 新しい順（降順）に並び替え
-        sorted_actual = sorted(actual_data, key=lambda x: x["date"], reverse=True)
+        sorted_actual = sorted(actual_data, key=get_sort_key, reverse=True)
         
         # 直近5件とそれ以外に分ける
         recent_data = sorted_actual[:5]
