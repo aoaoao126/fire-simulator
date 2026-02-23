@@ -676,23 +676,11 @@ with st.sidebar:
         "受給開始年齢",
         list(range(60, 76)),
         index=pension.get("start_age", 65) - 60,
-        help="年金の受給開始年齢を選択",
+        help="グラフ上に「年金開始」の目安を表示する年齢を選択します。金額シミュレーションには含まれません。",
     )
-    cols = st.columns(2)
-    with cols[0]:
-        pension["self_monthly"] = st.number_input(
-            "本人 月額（万円）",
-            min_value=0, max_value=100,
-            value=int(pension.get("self_monthly", 15)),
-            step=1,
-        )
-    with cols[1]:
-        pension["spouse_monthly"] = st.number_input(
-            "配偶者 月額（万円）",
-            min_value=0, max_value=100,
-            value=int(pension.get("spouse_monthly", 8)),
-            step=1,
-        )
+    # 金額入力は不要との要望により削除し、0に固定
+    pension["self_monthly"] = 0
+    pension["spouse_monthly"] = 0
 
     settings["pension"] = pension
 
