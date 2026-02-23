@@ -175,7 +175,7 @@ def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
     fig.update_layout(
         template="plotly_white",
         title=dict(
-            text="📘 FIRE資産推移シミュレーション",
+            text="FIRE資産推移シミュレーション",
             font=dict(size=20, color=DARK_TEXT, family="sans-serif"),
             x=0.5,
         ),
@@ -304,7 +304,7 @@ def build_chart_with_actual(results, settings, actual_data, mode="simple", y_max
                 mode="lines+markers",
                 line=dict(color=ACTUAL_LINE_COLOR, width=1.5),
                 marker=dict(size=4, color=ACTUAL_LINE_COLOR, symbol="circle"),
-                name="📍 資産実績",
+                name="資産実績",
                 hovertemplate="時期: %{x:.1f}<br>資産: %{y:,.0f}万円<extra>実績</extra>",
             ))
 
@@ -343,7 +343,7 @@ def _add_life_event_lines(fig, settings, years, y_max):
             line_dash="solid",
             line_color="#202124",
             line_width=2,
-            annotation_text="🔥 FIRE開始",
+            annotation_text="FIRE開始",
             annotation_position="top",
             annotation_font=dict(size=10, color="#202124"),
         )
@@ -356,7 +356,7 @@ def _add_life_event_lines(fig, settings, years, y_max):
             line_dash="dash",
             line_color="#7B1FA2",
             line_width=1.5,
-            annotation_text="💰 年金開始",
+            annotation_text="年金開始",
             annotation_position="top",
             annotation_font=dict(size=10, color="#7B1FA2"),
         )

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-📘 個人用FIREモンテカルロシミュレーター
+個人用FIREモンテカルロシミュレーター
 Streamlitメインアプリケーション
 白基調（Google Blue）デザイン、シンプル/詳細モード対応
 """
@@ -26,8 +26,8 @@ from chart_builder import build_chart_with_actual
 # ページ設定
 # ============================================================
 st.set_page_config(
-    page_title="📘 FIRE モンテカルロシミュレーター",
-    page_icon="📘",
+    page_title="FIRE モンテカルロシミュレーター",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -283,11 +283,11 @@ RELATION_OPTIONS = ["本人", "配偶者", "子供1", "子供2", "子供3"]
 # サイドバー
 # ============================================================
 with st.sidebar:
-    st.markdown("## 📘 FIRE シミュレーター")
+    st.markdown("## FIRE シミュレーター")
 
     # --- モード切替 ---
     is_detail = st.toggle(
-        "📊 詳細モード",
+        "詳細モード",
         value=(st.session_state.mode == "detail"),
         help="ON: 戦略検証用の詳細設定。OFF: 直感的なシンプル表示",
     )
@@ -304,7 +304,7 @@ with st.sidebar:
     # ==========================================================
     # 👤 人物情報
     # ==========================================================
-    section_header("👤 人物情報")
+    section_header("人物情報")
 
     family = settings.get("family", [])
 
@@ -347,7 +347,7 @@ with st.sidebar:
         family.pop(idx)
 
     # メンバー追加
-    if st.button("＋ メンバー追加", key="add_family"):
+    if st.button("メンバー追加", key="add_family"):
         family.append({"name": "", "birth_date": "2000-01-01", "relation": "配偶者"})
         st.rerun()
 
@@ -364,7 +364,7 @@ with st.sidebar:
     # ==========================================================
     # 💰 資産内訳
     # ==========================================================
-    section_header("💰 資産内訳")
+    section_header("資産内訳")
 
     cols_asset = st.columns(2)
     with cols_asset[0]:
@@ -385,14 +385,14 @@ with st.sidebar:
         )
 
     total_asset = settings["invested_asset"] + settings["cash_reserve"]
-    st.caption(f"📊 合計資産: **{total_asset:,} 万円**（運用 {settings['invested_asset']:,} + 現金 {settings['cash_reserve']:,}）")
+    st.caption(f"合計資産: **{total_asset:,} 万円**（運用 {settings['invested_asset']:,} + 現金 {settings['cash_reserve']:,}）")
 
     st.divider()
 
     # ==========================================================
     # 💵 毎月の貯金額（収入-支出の余剰）
     # ==========================================================
-    section_header("💵 毎月の貯金額")
+    section_header("毎月の貯金額")
     st.caption("収入 − 支出 の余剰分。現金プールに加算されます。")
 
     savings = settings.get("savings", [])
@@ -431,7 +431,7 @@ with st.sidebar:
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("＋ 貯金行を追加", key="add_savings"):
+    if st.button("貯金行を追加", key="add_savings"):
         savings.append({"start_ym": "2026/01", "end_ym": "2040/12", "monthly": 10})
         st.rerun()
 
@@ -442,7 +442,7 @@ with st.sidebar:
     # ==========================================================
     # 🔄 投資への振替額
     # ==========================================================
-    section_header("🔄 投資への振替額")
+    section_header("投資への振替額")
     st.caption("現金プールから運用資産への月額振替。現金が底をつくと自動的に停止します。")
 
     transfers = settings.get("transfer_to_investment", [])
@@ -481,7 +481,7 @@ with st.sidebar:
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("＋ 振替行を追加", key="add_transfer"):
+    if st.button("振替行を追加", key="add_transfer"):
         transfers.append({"start_ym": "2026/01", "end_ym": "2035/12", "monthly": 20})
         st.rerun()
 
@@ -492,7 +492,7 @@ with st.sidebar:
     # ==========================================================
     # 📈 市場・運用前提
     # ==========================================================
-    section_header("📈 市場・運用前提")
+    section_header("市場・運用前提")
     market = settings["market"]
 
     market["return_rate"] = st.number_input(
@@ -548,7 +548,7 @@ with st.sidebar:
     # ==========================================================
     # 📥 積立フェーズ
     # ==========================================================
-    section_header("📥 積立フェーズ")
+    section_header("積立フェーズ")
 
     contributions = settings.get("contributions", [])
 
@@ -586,7 +586,7 @@ with st.sidebar:
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("＋ 積立行を追加", key="add_contrib"):
+    if st.button("積立行を追加", key="add_contrib"):
         contributions.append({"start_ym": "2025/04", "end_ym": "2045/03", "monthly": 10})
         st.rerun()
 
@@ -597,7 +597,7 @@ with st.sidebar:
     # ==========================================================
     # 📤 取り崩しフェーズ
     # ==========================================================
-    section_header("📤 取り崩しフェーズ")
+    section_header("取り崩しフェーズ")
 
     withdrawals = settings.get("withdrawals", [])
 
@@ -658,7 +658,7 @@ with st.sidebar:
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("＋ 取崩行を追加", key="add_withdraw"):
+    if st.button("取崩行を追加", key="add_withdraw"):
         withdrawals.append({"start_ym": "2055/01", "end_ym": "2085/12", "method": "fixed", "value": 20})
         st.rerun()
 
@@ -669,7 +669,7 @@ with st.sidebar:
     # ==========================================================
     # 🏛 年金設定
     # ==========================================================
-    section_header("🏛 年金設定")
+    section_header("年金設定")
     pension = settings.get("pension", {})
 
     pension["start_age"] = st.selectbox(
@@ -701,7 +701,7 @@ with st.sidebar:
     # ==========================================================
     # 🎯 目標資産ライン
     # ==========================================================
-    section_header("🎯 目標資産ライン")
+    section_header("目標資産ライン")
     targets = settings.get("targets", [5000, 10000])
     # 最大3本
     while len(targets) < 3:
@@ -727,7 +727,7 @@ with st.sidebar:
     # ==========================================================
     # 📊 資産実績の入力
     # ==========================================================
-    section_header("📊 資産実績の入力（現在地の記録）")
+    section_header("資産実績の入力（現在地の記録）")
 
     actual_data = data.get("actual_data", [])
 
@@ -766,7 +766,7 @@ with st.sidebar:
     # ⚠️ 暴落・リスク設定（詳細モードのみ）
     # ==========================================================
     if mode == "detail":
-        section_header("⚠️ 暴落・リスク設定")
+        section_header("暴落・リスク設定")
         crash = settings.get("crash", {})
 
         crash["enabled"] = st.toggle(
@@ -814,7 +814,7 @@ with st.sidebar:
             help="取り崩し初期のリスクを強化する設定",
         )
         if seq_risk["enabled"]:
-            st.info("💡 取り崩し開始直後の暴落は、その後の資産寿命に壊滅的な影響を与えることがあります（シーケンスリスク）。このリスクに対する戦略の耐久度を検証します。")
+            st.info("取り崩し開始直後の暴落は、その後の資産寿命に壊滅的な影響を与えることがあります（シーケンスリスク）。このリスクに対する戦略の耐久度を検証します。")
             risk_type_labels = {"暴落確率2倍（5年間）": "double", "初年強制暴落": "forced"}
             risk_labels = list(risk_type_labels.keys())
             current_type = seq_risk.get("type", "double")
@@ -831,7 +831,7 @@ with st.sidebar:
         st.divider()
     else:
         # シンプルモード: 暴落ON/OFFのみ
-        section_header("⚠️ 暴落設定")
+        section_header("暴落設定")
         crash = settings.get("crash", {})
         crash["enabled"] = st.toggle(
             "暴落モード ON/OFF",
@@ -844,18 +844,18 @@ with st.sidebar:
     # ==========================================================
     # 💾 データ管理
     # ==========================================================
-    section_header("💾 データ管理")
+    section_header("データ管理")
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("💾 設定を保存", use_container_width=True):
+        if st.button("設定を保存", use_container_width=True):
             save_data(data)
-            st.toast("✅ 設定を保存しました", icon="💾")
+            st.toast("✅ 設定を保存しました")
 
     with col2:
         json_str = export_data_json(data)
         st.download_button(
-            "📥 JSONエクスポート",
+            "JSONエクスポート",
             data=json_str,
             file_name="fire_data.json",
             mime="application/json",
@@ -863,14 +863,14 @@ with st.sidebar:
         )
 
     # インポート
-    uploaded = st.file_uploader("📤 JSONインポート", type=["json"], key="import_json")
+    uploaded = st.file_uploader("JSONインポート", type=["json"], key="import_json")
     if uploaded:
         content = uploaded.read().decode("utf-8")
         imported = import_data_json(content)
         if imported:
             st.session_state.data = imported
             save_data(imported)
-            st.toast("✅ データをインポートしました", icon="📤")
+            st.toast("データをインポートしました")
             st.rerun()
         else:
             st.error("❌ JSONの形式が不正です")
@@ -884,7 +884,7 @@ with st.sidebar:
 mode_label = "シンプル" if mode == "simple" else "詳細"
 st.markdown(f"""
 <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-    <h1 style="margin:0; color:#3C4043; font-size:1.8rem;">📘 FIRE モンテカルロシミュレーター</h1>
+    <h1 style="margin:0; color:#3C4043; font-size:1.8rem;">FIRE モンテカルロシミュレーター</h1>
     <span class="mode-badge {'mode-simple' if mode == 'simple' else 'mode-detail'}">{mode_label}モード</span>
 </div>
 """, unsafe_allow_html=True)
@@ -893,7 +893,7 @@ st.markdown(f"""
 col_btn, col_info = st.columns([1, 3])
 with col_btn:
     run_sim = st.button(
-        "🚀 シミュレーション実行",
+        "シミュレーション実行",
         use_container_width=True,
         type="primary",
     )
@@ -994,11 +994,10 @@ else:
     # 未実行時のガイド
     st.markdown("""
     <div style="text-align:center; padding:80px 20px; color:#5F6368;">
-        <div style="font-size:3rem; margin-bottom:16px;">📘</div>
         <h2 style="color:#3C4043; font-weight:600;">シミュレーションを開始しましょう</h2>
         <p style="font-size:1.1rem; max-width:500px; margin:0 auto;">
             左のサイドバーで条件を設定し、<br>
-            <strong style="color:#1A73E8;">🚀 シミュレーション実行</strong> ボタンを押してください。
+            <strong style="color:#1A73E8;">シミュレーション実行</strong> ボタンを押してください。
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -1010,7 +1009,7 @@ else:
 st.markdown("---")
 st.markdown(
     '<div style="text-align:center; color:#9AA0A6; font-size:0.75rem;">'
-    '📘 FIRE モンテカルロシミュレーター v2.0 | データはローカルに保存されます'
+    'FIRE モンテカルロシミュレーター v2.0 | データはローカルに保存されます'
     '</div>',
     unsafe_allow_html=True,
 )
