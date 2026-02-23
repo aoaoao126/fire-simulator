@@ -66,6 +66,29 @@ def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
     chart_start_year = start_year if start_year is not None else years[0]
     chart_end_year = years[-1]
 
+    # --- 年間取崩額の計算 ---
+    def _calc_annual_withdrawal(asset_value, year):
+        """指定年の資産額に対する年間取崩額を計算する。"""
+        total = 0.0
+        for w in settings.get("withdrawals", []):
+            w_start_y, w_start_m = parse_ym(w.get("start_ym", ""))
+            w_end_y, w_end_m = parse_ym(w.get("end_ym", ""))
+            if w_start_y is None or w_end_y is None:
+                continue
+            if w_start_y <= year <= w_end_y:
+                if w.get("method", "fixed") == "fixed":
+                    total += w.get("value", 0) * 12
+                else:  # 定率
+                    total += asset_value * w.get("value", 0) / 100.0
+        return total
+
+    # 各カーブの年間取崩額を事前計算
+    median_wd = np.array([_calc_annual_withdrawal(float(median[i]), int(years[i])) for i in range(len(years))])
+    p90_wd = np.array([_calc_annual_withdrawal(float(p90[i]), int(years[i])) for i in range(len(years))])
+    p10_wd = np.array([_calc_annual_withdrawal(float(p10[i]), int(years[i])) for i in range(len(years))])
+    if p5 is not None:
+        p5_wd = np.array([_calc_annual_withdrawal(float(p5[i]), int(years[i])) for i in range(len(years))])
+
     # --- Figure作成 ---
     fig = go.Figure()
 
@@ -101,7 +124,8 @@ def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
         mode="lines",
         line=dict(color=ACCENT_GREEN, width=1.5, dash="dot"),
         name="上位10% (P90)",
-        hovertemplate="西暦: %{x}<br>資産: %{y:,.0f}万円<extra>P90</extra>",
+        customdata=np.stack([p90_wd], axis=-1),
+        hovertemplate="西暦: %{x}<br>資産: %{y:,.0f}万円<br>年間取崩: %{customdata[0]:,.0f}万円<extra>P90</extra>",
     ))
 
     # --- P10ライン（赤） ---
@@ -110,7 +134,8 @@ def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
         mode="lines",
         line=dict(color=ACCENT_RED, width=1.5, dash="dot"),
         name="下位10% (P10)",
-        hovertemplate="西暦: %{x}<br>資産: %{y:,.0f}万円<extra>P10</extra>",
+        customdata=np.stack([p10_wd], axis=-1),
+        hovertemplate="西暦: %{x}<br>資産: %{y:,.0f}万円<br>年間取崩: %{customdata[0]:,.0f}万円<extra>P10</extra>",
     ))
 
     # --- P5ライン（詳細モードのみ） ---
@@ -120,7 +145,8 @@ def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
             mode="lines",
             line=dict(color="#D93025", width=1.5, dash="dashdot"),
             name="下位5% (P5)",
-            hovertemplate="西暦: %{x}<br>資産: %{y:,.0f}万円<extra>P5</extra>",
+            customdata=np.stack([p5_wd], axis=-1),
+            hovertemplate="西暦: %{x}<br>資産: %{y:,.0f}万円<br>年間取崩: %{customdata[0]:,.0f}万円<extra>P5</extra>",
         ))
 
     # --- 中央値（青太線） ---
@@ -129,8 +155,31 @@ def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
         mode="lines",
         line=dict(color=GOOGLE_BLUE, width=3),
         name="中央値",
-        hovertemplate="西暦: %{x}<br>資産: %{y:,.0f}万円<extra>中央値</extra>",
+        customdata=np.stack([median_wd], axis=-1),
+        hovertemplate="西暦: %{x}<br>資産: %{y:,.0f}万円<br>年間取崩: %{customdata[0]:,.0f}万円<extra>中央値</extra>",
     ))
+
+    # --- 取崩フェーズで5年ごとに中央値の年間取崩額をアノテーション ---
+    fire_y, fire_m = get_fire_start_ym(settings)
+    if fire_y:
+        for i, yr in enumerate(years):
+            yr_int = int(yr)
+            if yr_int >= fire_y and (yr_int - fire_y) % 5 == 0 and median_wd[i] > 0:
+                wd_text = f"{median_wd[i]:,.0f}万/年"
+                fig.add_annotation(
+                    x=yr_int, y=float(median[i]),
+                    text=wd_text,
+                    showarrow=True,
+                    arrowhead=0,
+                    arrowwidth=1,
+                    arrowcolor="#E65100",
+                    ax=0, ay=-30,
+                    font=dict(size=9, color="#E65100"),
+                    bgcolor="rgba(255,243,224,0.9)",
+                    bordercolor="#FFB74D",
+                    borderwidth=1,
+                    borderpad=2,
+                )
 
     # --- 理論複利カーブ ---
     curve_colors = {"3%": "#B0BEC5", "5%": "#78909C", "7%": "#546E7A"}
@@ -350,36 +399,6 @@ def _add_life_event_lines(fig, settings, years, y_max):
             annotation_font=dict(size=10, color="#202124"),
         )
 
-    # 取り崩しフェーズの金額アノテーション
-    withdrawals = settings.get("withdrawals", [])
-    for i, w in enumerate(withdrawals):
-        w_start_y, w_start_m = parse_ym(w.get("start_ym", ""))
-        w_end_y, w_end_m = parse_ym(w.get("end_ym", ""))
-        if w_start_y is None or w_end_y is None:
-            continue
-        if w_end_y < min_year or w_start_y > max_year:
-            continue
-        # 表示位置: フェーズ中央
-        x_start = w_start_y + (w_start_m - 1) / 12.0
-        x_end = w_end_y + (w_end_m - 1) / 12.0
-        x_mid = (x_start + x_end) / 2.0
-        # 金額テキスト
-        if w.get("method", "fixed") == "fixed":
-            amount_text = f"月{int(w.get('value', 0))}万円"
-        else:
-            amount_text = f"年{w.get('value', 0)}%取崩"
-        # Y位置をずらして複数フェーズが重ならないようにする
-        y_pos = y_max * (0.12 + 0.06 * i)
-        fig.add_annotation(
-            x=x_mid, y=y_pos,
-            text=f"📤 {amount_text}",
-            showarrow=False,
-            font=dict(size=11, color="#E65100"),
-            bgcolor="rgba(255,243,224,0.85)",
-            bordercolor="#FFB74D",
-            borderwidth=1,
-            borderpad=4,
-        )
 
     # 年金開始
     pension_year = get_pension_start_year(settings)
