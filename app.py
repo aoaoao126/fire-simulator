@@ -171,8 +171,8 @@ st.markdown("""
     /* タブレット横向き（1024px〜1366px） */
     @media screen and (max-width: 1366px) and (min-width: 768px) {
         section[data-testid="stSidebar"] {
-            min-width: 400px;
-            max-width: 480px;
+            min-width: 450px;
+            max-width: 550px;
         }
         .kpi-card {
             padding: 16px 12px;
@@ -185,8 +185,8 @@ st.markdown("""
     /* タブレット縦向き（768px〜1024px） */
     @media screen and (max-width: 1024px) {
         section[data-testid="stSidebar"] {
-            min-width: 360px;
-            max-width: 420px;
+            min-width: 400px;
+            max-width: 450px;
         }
         .kpi-value {
             font-size: 1.4rem;
@@ -400,7 +400,7 @@ with st.sidebar:
     for i, s in enumerate(savings):
         with st.container():
             st.markdown(f'<div class="phase-card">', unsafe_allow_html=True)
-            cols = st.columns([2, 2, 1.5, 0.5])
+            cols = st.columns([1.8, 1.8, 1.8, 0.6])
             with cols[0]:
                 s["start_ym"] = st.text_input(
                     "開始年月", value=s.get("start_ym", "2026/01"),
@@ -450,7 +450,7 @@ with st.sidebar:
     for i, tr in enumerate(transfers):
         with st.container():
             st.markdown(f'<div class="phase-card">', unsafe_allow_html=True)
-            cols = st.columns([2, 2, 1.5, 0.5])
+            cols = st.columns([1.8, 1.8, 1.8, 0.6])
             with cols[0]:
                 tr["start_ym"] = st.text_input(
                     "開始年月", value=tr.get("start_ym", "2026/01"),
@@ -555,7 +555,7 @@ with st.sidebar:
     for i, c in enumerate(contributions):
         with st.container():
             st.markdown(f'<div class="phase-card">', unsafe_allow_html=True)
-            cols = st.columns([2, 2, 1.5, 0.5])
+            cols = st.columns([1.8, 1.8, 1.8, 0.6])
             with cols[0]:
                 c["start_ym"] = st.text_input(
                     "開始年月", value=c.get("start_ym", "2025/04"),
@@ -604,7 +604,7 @@ with st.sidebar:
     for i, w in enumerate(withdrawals):
         with st.container():
             st.markdown(f'<div class="phase-card">', unsafe_allow_html=True)
-            cols = st.columns([2, 2, 1.5, 1.5, 0.5])
+            cols = st.columns([1.8, 1.8, 2.2, 2.0, 0.7])
             with cols[0]:
                 w["start_ym"] = st.text_input(
                     "開始年月", value=w.get("start_ym", "2055/01"),
