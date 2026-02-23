@@ -125,11 +125,28 @@ st.markdown("""
 
     /* データテーブル */
     .actual-data-row {
+        background: #FFFFFF;
+        border: 1px solid #E8EAED;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 6px;
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        padding: 6px 0;
-        border-bottom: 1px solid #F1F3F4;
-        gap: 12px;
+    }
+    .actual-data-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .actual-data-date {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #3C4043;
+    }
+    .actual-data-amount {
+        font-size: 0.85rem;
+        color: #1A73E8;
     }
 
     /* フェーズ行 */
@@ -764,7 +781,9 @@ with st.sidebar:
         with cols[2]:
             if st.button("追加", key="add_actual"):
                 if new_date and new_amount > 0:
-                    data = add_actual_data(data, new_date, new_amount)
+                    # フォーマットを統一 (YYYY/MM -> YYYY-MM)
+                    fmt_date = new_date.replace("/", "-")
+                    data = add_actual_data(data, fmt_date, new_amount)
                     save_data(data)
                     st.rerun()
 
@@ -772,16 +791,23 @@ with st.sidebar:
     if actual_data:
         st.caption("📋 記録済みデータ:")
         for entry in actual_data:
-            cols = st.columns([2, 2, 1])
-            with cols[0]:
-                st.text(entry["date"])
-            with cols[1]:
-                st.text(f"{format_man_yen(entry['amount'])} 万円")
-            with cols[2]:
-                if st.button("削除", key=f"del_actual_{entry['date']}"):
-                    data = remove_actual_data(data, entry["date"])
-                    save_data(data)
-                    st.rerun()
+            with st.container():
+                cols = st.columns([4, 1])
+                with cols[0]:
+                    st.markdown(f"""
+                    <div class="actual-data-row">
+                        <div class="actual-data-info">
+                            <span class="actual-data-date">{entry['date']}</span>
+                            <span class="actual-data-amount">{format_man_yen(entry['amount'])} 万円</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with cols[1]:
+                    # 削除ボタン。ラベルを「✕」にしてiPadでも押しやすくする
+                    if st.button("✕", key=f"del_actual_{entry['date']}", help="この記録を削除"):
+                        data = remove_actual_data(data, entry["date"])
+                        save_data(data)
+                        st.rerun()
 
     st.divider()
 

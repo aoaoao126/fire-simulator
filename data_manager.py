@@ -108,6 +108,24 @@ def load_data():
                 _deep_merge(default["settings"], data["settings"])
             if "actual_data" not in data:
                 data["actual_data"] = []
+            
+            # 実績データを日付順にソート（旧形式の混在や順序不正を解消）
+            def _get_sort_key(entry):
+                d = entry.get("date", "")
+                for sep in ["-", "/"]:
+                    if sep in d:
+                        try:
+                            parts = d.split(sep)
+                            return int(parts[0]) * 12 + (int(parts[1]) if len(parts) > 1 else 1)
+                        except ValueError:
+                            continue
+                try:
+                    return int(d[:4]) * 12
+                except ValueError:
+                    return 0
+            
+            data["actual_data"].sort(key=_get_sort_key)
+            
             # 旧フォーマット（年単位）からのマイグレーション
             data = _migrate_to_monthly(data)
             return data
@@ -168,7 +186,22 @@ def add_actual_data(data, date_str, amount):
             entry["amount"] = amount
             return data
     data["actual_data"].append({"date": date_str, "amount": amount})
-    data["actual_data"].sort(key=lambda x: x["date"])
+    
+    def _get_sort_key(entry):
+        d = entry.get("date", "")
+        for sep in ["-", "/"]:
+            if sep in d:
+                try:
+                    parts = d.split(sep)
+                    return int(parts[0]) * 12 + (int(parts[1]) if len(parts) > 1 else 1)
+                except ValueError:
+                    continue
+        try:
+            return int(d[:4]) * 12
+        except ValueError:
+            return 0
+
+    data["actual_data"].sort(key=_get_sort_key)
     return data
 
 
