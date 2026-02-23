@@ -302,8 +302,8 @@ def build_chart_with_actual(results, settings, actual_data, mode="simple", y_max
                 x=plot_dates,
                 y=plot_amounts,
                 mode="lines+markers",
-                line=dict(color=ACTUAL_LINE_COLOR, width=3),
-                marker=dict(size=6, color=ACTUAL_LINE_COLOR, symbol="circle"),
+                line=dict(color=ACTUAL_LINE_COLOR, width=1.5),
+                marker=dict(size=4, color=ACTUAL_LINE_COLOR, symbol="circle"),
                 name="📍 資産実績",
                 hovertemplate="時期: %{x:.1f}<br>資産: %{y:,.0f}万円<extra>実績</extra>",
             ))
