@@ -238,15 +238,27 @@ def build_chart_with_actual(results, settings, actual_data, mode="simple", y_max
     """
     #実績データから開始年を計算
     min_actual_year = results["years"][0]
+    
+    def _parse_year_flexible(date_str):
+        """'-' または '/' 区切りの文字列から年を取得する"""
+        if not date_str: return None
+        for sep in ["-", "/"]:
+            if sep in date_str:
+                try:
+                    return int(date_str.split(sep)[0])
+                except ValueError:
+                    continue
+        # セパレータがない場合（年のみなど）のフォールバック
+        try:
+            return int(date_str[:4])
+        except ValueError:
+            return None
+
     if actual_data:
         for entry in actual_data:
-            try:
-                parts = entry["date"].split("-")
-                year = int(parts[0])
-                if year < min_actual_year:
-                    min_actual_year = year
-            except (ValueError, IndexError):
-                continue
+            year = _parse_year_flexible(entry.get("date", ""))
+            if year and year < min_actual_year:
+                min_actual_year = year
 
     fig = build_chart(results, settings, mode, y_max, start_year=min_actual_year)
 
@@ -254,22 +266,31 @@ def build_chart_with_actual(results, settings, actual_data, mode="simple", y_max
     if actual_data:
         actual_dates = []
         actual_amounts = []
-        for entry in sorted(actual_data, key=lambda x: x["date"]):
+        
+        # 日付文字列から x軸値を計算する内部関数
+        def _get_x_val(date_str):
+            for sep in ["-", "/"]:
+                if sep in date_str:
+                    try:
+                        parts = date_str.split(sep)
+                        y = int(parts[0])
+                        m = int(parts[1]) if len(parts) > 1 else 1
+                        return y + (m - 1) / 12.0
+                    except ValueError:
+                        continue
             try:
-                parts = entry["date"].split("-")
-                year = int(parts[0])
-                month = int(parts[1]) if len(parts) > 1 else 1
-                # x軸: 年 + 月/12 で小数位置
-                actual_dates.append(year + (month - 1) / 12.0)
+                return float(date_str[:4])
+            except ValueError:
+                return None
+
+        for entry in sorted(actual_data, key=lambda x: _get_x_val(x["date"]) or 0):
+            x_val = _get_x_val(entry["date"])
+            if x_val is not None:
+                actual_dates.append(x_val)
                 actual_amounts.append(entry["amount"])
-            except (ValueError, IndexError):
-                continue
 
         if actual_dates:
             # シミュレーションの開始点（現在）を取得して実績の最後に繋げる
-            # results["years"][0] は現在の年（小数なし）
-            # 実績の最後とシミュレーションの最初を繋ぐために、
-            # シミュレーションの最初のデータも追加する（オプションだが、線が繋がるように）
             sim_start_x = results["years"][0]
             sim_start_y = results["median"][0]
             
