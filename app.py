@@ -252,6 +252,20 @@ st.markdown("""
         }
     }
 
+    /* エキスパンダーのスタイル調整 */
+    .stExpander {
+        border: 1px solid #E8EAED !important;
+        border-radius: 8px !important;
+        background-color: #FAFBFC !important;
+        margin-top: 10px;
+    }
+    /* エキスパンダーのラベルテキスト */
+    .stExpander summary p {
+        color: #1A73E8 !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+    }
+
     /* PWA/フルスクリーン時のsafe-area対応（ノッチ付きiPad等） */
     @supports (padding: env(safe-area-inset-top)) {
         .stApp {
@@ -773,24 +787,32 @@ with st.sidebar:
 
     # 新規入力フォーム
     with st.container():
-        cols = st.columns([2, 2, 1])
+        cols = st.columns([2, 1.8, 0.8])
         with cols[0]:
-            new_date = st.text_input("年月", placeholder="YYYY-MM", key="new_actual_date")
+            new_date = st.text_input("年月", placeholder="YYYY-MM (年月)", key="new_actual_date", label_visibility="collapsed")
         with cols[1]:
-            new_amount = st.number_input("資産額（万円）", min_value=0, max_value=100000, value=0, step=100, key="new_actual_amount")
+            new_amount = st.number_input("資産額（万円）", min_value=0, max_value=100000, value=0, step=100, key="new_actual_amount", label_visibility="collapsed")
         with cols[2]:
-            if st.button("追加", key="add_actual"):
+            if st.button("追加", key="add_actual", use_container_width=True):
                 if new_date and new_amount > 0:
                     # フォーマットを統一 (YYYY/MM -> YYYY-MM)
                     fmt_date = new_date.replace("/", "-")
-                    data = add_actual_data(data, fmt_date, new_amount)
-                    save_data(data)
+                    st.session_state.data = add_actual_data(st.session_state.data, fmt_date, new_amount)
+                    save_data(st.session_state.data)
                     st.rerun()
 
     # 既存データ一覧
     if actual_data:
-        st.caption("📋 記録済みデータ:")
-        for entry in actual_data:
+        st.caption("📋 記録済みデータ (最新5件):")
+        
+        # 新しい順（降順）に並び替え
+        sorted_actual = sorted(actual_data, key=lambda x: x["date"], reverse=True)
+        
+        # 直近5件とそれ以外に分ける
+        recent_data = sorted_actual[:5]
+        older_data = sorted_actual[5:]
+
+        def display_row(entry, is_older=False):
             with st.container():
                 cols = st.columns([4, 1])
                 with cols[0]:
@@ -803,11 +825,22 @@ with st.sidebar:
                     </div>
                     """, unsafe_allow_html=True)
                 with cols[1]:
-                    # 削除ボタン。ラベルを「✕」にしてiPadでも押しやすくする
-                    if st.button("✕", key=f"del_actual_{entry['date']}", help="この記録を削除"):
-                        data = remove_actual_data(data, entry["date"])
-                        save_data(data)
+                    # 削除ボタン。ユニークなキーを付与（is_olderで区別）
+                    key_suffix = "_old" if is_older else ""
+                    if st.button("✕", key=f"del_actual_{entry['date']}{key_suffix}", help="この記録を削除"):
+                        st.session_state.data = remove_actual_data(st.session_state.data, entry["date"])
+                        save_data(st.session_state.data)
                         st.rerun()
+
+        # 直近5件の表示
+        for entry in recent_data:
+            display_row(entry)
+        
+        # 6件目以降を折りたたみ表示
+        if older_data:
+            with st.expander("以前の記録を表示", expanded=False):
+                for entry in older_data:
+                    display_row(entry, is_older=True)
 
     st.divider()
 
