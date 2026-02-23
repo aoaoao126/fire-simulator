@@ -790,6 +790,7 @@ with st.sidebar:
                 "継続年数", [1, 2],
                 index=0 if crash.get("duration", 1) == 1 else 1,
                 horizontal=True,
+                help="暴落が始まってから底を打つまでの期間です。",
             )
             recovery_options = {"1年回復": "1year", "3年回復": "3year", "ランダム": "random"}
             recovery_labels = list(recovery_options.keys())
@@ -798,6 +799,7 @@ with st.sidebar:
             recovery_selected = st.radio(
                 "回復モデル", recovery_labels,
                 index=recovery_idx, horizontal=True,
+                help="下落後、元の成長トレンドに戻るまでの期間。ランダムは1〜5年の間で変動します。",
             )
             crash["recovery"] = recovery_options[recovery_selected]
 
@@ -812,6 +814,7 @@ with st.sidebar:
             help="取り崩し初期のリスクを強化する設定",
         )
         if seq_risk["enabled"]:
+            st.info("💡 取り崩し開始直後の暴落は、その後の資産寿命に壊滅的な影響を与えることがあります（シーケンスリスク）。このリスクに対する戦略の耐久度を検証します。")
             risk_type_labels = {"暴落確率2倍（5年間）": "double", "初年強制暴落": "forced"}
             risk_labels = list(risk_type_labels.keys())
             current_type = seq_risk.get("type", "double")
@@ -819,6 +822,7 @@ with st.sidebar:
             selected_type = st.radio(
                 "リスクタイプ", risk_labels,
                 index=type_idx, horizontal=True,
+                help="『暴落確率2倍』は取崩開始から5年間リスクを高めます。『強制暴落』は取崩開始の初年に必ず設定した暴落を発生させます。",
             )
             seq_risk["type"] = risk_type_labels[selected_type]
 
