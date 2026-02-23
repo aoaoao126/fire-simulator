@@ -170,9 +170,15 @@ st.markdown("""
 
     /* タブレット横向き（1024px〜1366px） */
     @media screen and (max-width: 1366px) and (min-width: 768px) {
-        section[data-testid="stSidebar"] {
+        /* サイドバーが開いている時だけ幅を固定 */
+        section[data-testid="stSidebar"][aria-expanded="true"] {
             min-width: 450px;
             max-width: 550px;
+        }
+        .main .block-container {
+            max-width: 95% !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
         }
         .kpi-card {
             padding: 16px 12px;
@@ -184,9 +190,15 @@ st.markdown("""
 
     /* タブレット縦向き（768px〜1024px） */
     @media screen and (max-width: 1024px) {
-        section[data-testid="stSidebar"] {
+        /* サイドバーが開いている時だけ幅を固定 */
+        section[data-testid="stSidebar"][aria-expanded="true"] {
             min-width: 400px;
             max-width: 450px;
+        }
+        .main .block-container {
+            max-width: 98% !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
         }
         .kpi-value {
             font-size: 1.4rem;
