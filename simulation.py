@@ -61,9 +61,25 @@ def run_simulation(settings, current_year=None, current_month=None):
     initial_cash = settings.get("cash_reserve", 0)
     initial_total = initial_invested + initial_cash
 
-    # シミュレーション期間: 60年間（月単位）
-    n_years = 60
-    n_months = n_years * 12
+    # --- シミュレーション期間の決定 ---
+    # 取り崩しフェーズの最後の終了年月を検索
+    max_ym = None
+    for w in settings.get("withdrawals", []):
+        wy, wm = parse_ym(w.get("end_ym", ""))
+        if wy is not None:
+            if max_ym is None or (wy > max_ym[0] or (wy == max_ym[0] and wm > max_ym[1])):
+                max_ym = (wy, wm)
+
+    if max_ym:
+        # 現在から取り崩し終了までの月数を計算
+        n_months = (max_ym[0] - current_year) * 12 + (max_ym[1] - current_month)
+        # 余裕を持って1ヶ月分追加（終了月まで含める）
+        n_months = max(12, n_months + 1)
+        n_years = int(np.ceil(n_months / 12))
+    else:
+        # 取り崩し設定がない場合はデフォルト60年
+        n_years = 60
+        n_months = n_years * 12
 
     # 月率に変換
     monthly_return = annual_return / 12.0
