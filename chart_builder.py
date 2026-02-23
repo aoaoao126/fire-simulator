@@ -31,7 +31,7 @@ EDU_COLORS = {
 }
 
 
-def build_chart(results, settings, mode="simple", y_max=30000):
+def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
     """
     シミュレーション結果からPlotlyのFigureを生成する。
 
@@ -45,6 +45,8 @@ def build_chart(results, settings, mode="simple", y_max=30000):
         "simple" or "detail"
     y_max : int
         Y軸上限（万円、デフォルト30,000=3億円）
+    start_year : int, optional
+        グラフの開始年。省略時はシミュレーション開始年。
 
     Returns
     -------
@@ -59,6 +61,10 @@ def build_chart(results, settings, mode="simple", y_max=30000):
     compound_curves = results.get("compound_curves", {})
 
     family = settings.get("family", [])
+
+    # 表示範囲の決定
+    chart_start_year = start_year if start_year is not None else years[0]
+    chart_end_year = years[-1]
 
     # --- Figure作成 ---
     fig = go.Figure()
@@ -160,7 +166,10 @@ def build_chart(results, settings, mode="simple", y_max=30000):
     _add_life_event_lines(fig, settings, years, y_max)
 
     # --- 横軸の年齢ラベル構築 ---
-    age_labels = _build_age_tick_labels(family, years)
+    # 表示開始年からのラベルを作成するために sample_years を計算
+    display_years = np.arange(chart_start_year, chart_end_year + 1)
+    # 年齢ラベルのサンプリング間隔を5年に
+    age_labels = _build_age_tick_labels(family, display_years)
 
     # --- レイアウト設定 ---
     fig.update_layout(
@@ -177,7 +186,7 @@ def build_chart(results, settings, mode="simple", y_max=30000):
             tickfont=dict(size=11, color=DARK_TEXT),
             gridcolor="rgba(0,0,0,0.04)",
             showgrid=True,
-            range=[years[0], years[-1]],
+            range=[chart_start_year, chart_end_year],
         ),
         yaxis=dict(
             title=dict(text="資産額（万円）", font=dict(size=13, color=DARK_TEXT)),
@@ -227,7 +236,19 @@ def build_chart_with_actual(results, settings, actual_data, mode="simple", y_max
     -------
     plotly.graph_objects.Figure
     """
-    fig = build_chart(results, settings, mode, y_max)
+    #実績データから開始年を計算
+    min_actual_year = results["years"][0]
+    if actual_data:
+        for entry in actual_data:
+            try:
+                parts = entry["date"].split("-")
+                year = int(parts[0])
+                if year < min_actual_year:
+                    min_actual_year = year
+            except (ValueError, IndexError):
+                continue
+
+    fig = build_chart(results, settings, mode, y_max, start_year=min_actual_year)
 
     # --- 実績データラインの追加 ---
     if actual_data:
@@ -245,9 +266,20 @@ def build_chart_with_actual(results, settings, actual_data, mode="simple", y_max
                 continue
 
         if actual_dates:
+            # シミュレーションの開始点（現在）を取得して実績の最後に繋げる
+            # results["years"][0] は現在の年（小数なし）
+            # 実績の最後とシミュレーションの最初を繋ぐために、
+            # シミュレーションの最初のデータも追加する（オプションだが、線が繋がるように）
+            sim_start_x = results["years"][0]
+            sim_start_y = results["median"][0]
+            
+            # 実績データの最後にシミュレーション開始点を追加して線を繋げる
+            plot_dates = actual_dates + [sim_start_x]
+            plot_amounts = actual_amounts + [sim_start_y]
+
             fig.add_trace(go.Scatter(
-                x=actual_dates,
-                y=actual_amounts,
+                x=plot_dates,
+                y=plot_amounts,
                 mode="lines+markers",
                 line=dict(color=ACTUAL_LINE_COLOR, width=3),
                 marker=dict(size=6, color=ACTUAL_LINE_COLOR, symbol="circle"),
