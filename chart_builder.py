@@ -350,6 +350,37 @@ def _add_life_event_lines(fig, settings, years, y_max):
             annotation_font=dict(size=10, color="#202124"),
         )
 
+    # 取り崩しフェーズの金額アノテーション
+    withdrawals = settings.get("withdrawals", [])
+    for i, w in enumerate(withdrawals):
+        w_start_y, w_start_m = parse_ym(w.get("start_ym", ""))
+        w_end_y, w_end_m = parse_ym(w.get("end_ym", ""))
+        if w_start_y is None or w_end_y is None:
+            continue
+        if w_end_y < min_year or w_start_y > max_year:
+            continue
+        # 表示位置: フェーズ中央
+        x_start = w_start_y + (w_start_m - 1) / 12.0
+        x_end = w_end_y + (w_end_m - 1) / 12.0
+        x_mid = (x_start + x_end) / 2.0
+        # 金額テキスト
+        if w.get("method", "fixed") == "fixed":
+            amount_text = f"月{int(w.get('value', 0))}万円"
+        else:
+            amount_text = f"年{w.get('value', 0)}%取崩"
+        # Y位置をずらして複数フェーズが重ならないようにする
+        y_pos = y_max * (0.12 + 0.06 * i)
+        fig.add_annotation(
+            x=x_mid, y=y_pos,
+            text=f"📤 {amount_text}",
+            showarrow=False,
+            font=dict(size=11, color="#E65100"),
+            bgcolor="rgba(255,243,224,0.85)",
+            bordercolor="#FFB74D",
+            borderwidth=1,
+            borderpad=4,
+        )
+
     # 年金開始
     pension_year = get_pension_start_year(settings)
     if pension_year and min_year <= pension_year <= max_year:
