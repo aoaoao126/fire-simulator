@@ -61,6 +61,11 @@ def run_simulation(settings, current_year=None, current_month=None):
     initial_cash = settings.get("cash_reserve", 0)
     initial_total = initial_invested + initial_cash
 
+    # FIRE出口戦略パラメータ
+    fire_cash_reserve = settings.get("fire_cash_reserve", 1500)  # FIRE時の確保現金額（万円）
+    crash_threshold = settings.get("crash_threshold", 20) / 100.0  # 暴落判定しきい値
+    post_fire_return = settings.get("post_fire_return_rate", 3.0) / 100.0  # FIRE後リターン（年率）
+
     # --- シミュレーション期間の決定 ---
     # 取り崩しフェーズの最後の終了年月を検索
     max_ym = None
@@ -195,17 +200,39 @@ def run_simulation(settings, current_year=None, current_month=None):
 
     # 取崩開始年の特定
     withdrawal_start_year = None
+    fire_start_month_idx = None  # FIRE開始月のインデックス
     for w in settings.get("withdrawals", []):
-        wy, _ = parse_ym(w.get("start_ym", ""))
+        wy, wm_start = parse_ym(w.get("start_ym", ""))
         if wy is not None:
             if withdrawal_start_year is None or wy < withdrawal_start_year:
                 withdrawal_start_year = wy
+            # FIRE開始月インデックスの算出
+            for month_idx in range(n_months):
+                y, m = months_axis[month_idx]
+                if y == wy and m == wm_start:
+                    if fire_start_month_idx is None or month_idx < fire_start_month_idx:
+                        fire_start_month_idx = month_idx
+                    break
 
     # --- モンテカルロ試行 ---
     np.random.seed(None)
 
     # 月次リターンを一括生成
     random_returns = np.random.normal(monthly_return, monthly_vol, (n_sim, n_months))
+
+    # FIRE後リターンの切り替え: FIRE開始月以降は別のリターン・ボラティリティを適用
+    if fire_start_month_idx is not None and fire_start_month_idx < n_months:
+        post_fire_monthly_return = post_fire_return / 12.0
+        # ボラティリティはリターン比に応じてスケーリング（保守的運用を反映）
+        if annual_return > 0:
+            vol_scale = post_fire_return / annual_return
+        else:
+            vol_scale = 1.0
+        post_fire_monthly_vol = monthly_vol * vol_scale
+        random_returns[:, fire_start_month_idx:] = np.random.normal(
+            post_fire_monthly_return, post_fire_monthly_vol,
+            (n_sim, n_months - fire_start_month_idx)
+        )
 
     # 暴落の適用
     if crash_enabled:
@@ -238,7 +265,7 @@ def run_simulation(settings, current_year=None, current_month=None):
                     monthly_crash = crash_drop / crash_remaining if crash_remaining > 0 else 0
                     random_returns[sim, start_m:end_m] = -monthly_crash
 
-    # --- 資産パスの計算（運用資産 + 現金プール分離） ---
+    # --- 資産パスの計算（運用資産 + 現金プール分離 + キャッシュクッション） ---
     invested_paths = np.zeros((n_sim, n_months + 1))
     cash_paths = np.zeros((n_sim, n_months + 1))
     all_paths = np.zeros((n_sim, n_months + 1))
@@ -249,9 +276,26 @@ def run_simulation(settings, current_year=None, current_month=None):
 
     yearly_base = np.full(n_sim, float(initial_invested))
 
+    # 直近最高値のトラッキング（暴落判定用、各パスで独立）
+    all_time_high = np.full(n_sim, float(initial_invested))
+    # FIRE開始リバランス済みフラグ
+    fire_rebalanced = False
+
     for t in range(n_months):
         returns = random_returns[:, t]
         y, m = months_axis[t]
+
+        # === FIRE開始時のリバランス（現金確保） ===
+        if fire_start_month_idx is not None and t == fire_start_month_idx and not fire_rebalanced:
+            fire_rebalanced = True
+            # 総資産を再配分: 現金プールにfire_cash_reserveを確保
+            total_at_fire = invested_paths[:, t] + cash_paths[:, t]
+            # 確保額が総資産を超えないように制限
+            actual_reserve = np.minimum(fire_cash_reserve, total_at_fire)
+            cash_paths[:, t] = actual_reserve
+            invested_paths[:, t] = total_at_fire - actual_reserve
+            # リバランス後の値で直近最高値を初期化
+            all_time_high = invested_paths[:, t].copy()
 
         # 年初に基準資産を更新（定率取崩用）
         if m == 1:
@@ -275,19 +319,68 @@ def run_simulation(settings, current_year=None, current_month=None):
             available_for_transfer,  # 現金不足時 → 振替可能な分だけ
             transfer_schedule[t]     # 現金十分時 → 設定通り
         )
-        cash_paths[:, t + 1] = np.maximum(
+        current_cash = np.maximum(
             cash_paths[:, t] + savings_schedule[t] - actual_transfer, 0
         )
 
-        # --- 運用資産の更新 ---
-        # 運用資産 = 前月運用 × (1 + リターン) + 振替 + 積立 - 取崩 + 年金
-        invested_paths[:, t + 1] = (
-            invested_paths[:, t] * (1 + returns)
-            + actual_transfer
-            + contributions_schedule[t]
-            - actual_withdrawal
-            + pension_schedule[t]
-        )
+        # --- 運用資産のリターン適用 ---
+        invested_after_return = invested_paths[:, t] * (1 + returns) + actual_transfer + contributions_schedule[t]
+
+        # --- 取り崩しフェーズのキャッシュ・クッション・ロジック ---
+        if fire_start_month_idx is not None and t >= fire_start_month_idx and (isinstance(actual_withdrawal, np.ndarray) or actual_withdrawal > 0):
+            # 直近最高値の更新（投資リターン適用後の値で判定）
+            all_time_high = np.maximum(all_time_high, invested_after_return)
+
+            # 暴落判定: (最高値 - 現在値) / 最高値 >= しきい値
+            drawdown = np.where(
+                all_time_high > 0,
+                (all_time_high - invested_after_return) / all_time_high,
+                0.0
+            )
+            is_crash = drawdown >= crash_threshold
+
+            # --- 暴落時: 現金プールから取り崩し ---
+            # --- 通常時: 運用資産から取り崩し ---
+            # 暴落時の処理
+            crash_withdrawal_from_cash = np.where(is_crash, np.minimum(actual_withdrawal, current_cash), 0)
+            crash_withdrawal_from_invested = np.where(
+                is_crash,
+                np.where(current_cash >= actual_withdrawal, 0, actual_withdrawal - current_cash),  # 現金枯渇時は運用から
+                0
+            )
+            # 通常時の処理
+            normal_withdrawal_from_invested = np.where(is_crash, 0, actual_withdrawal)
+
+            # 運用資産 = リターン適用後 - 取り崩し（通常時 or 現金枯渇時）+ 年金
+            invested_after_return = (
+                invested_after_return
+                - normal_withdrawal_from_invested
+                - crash_withdrawal_from_invested
+                + pension_schedule[t]
+            )
+
+            # 現金プール = 前回 - 暴落時取り崩し
+            current_cash = current_cash - crash_withdrawal_from_cash
+
+            # --- 通常時の現金自動補充 ---
+            # 条件: 暴落していない AND 現金がfire_cash_reserveを下回っている
+            cash_deficit = np.maximum(fire_cash_reserve - current_cash, 0)
+            should_replenish = (~is_crash) & (cash_deficit > 0)
+            # 補充額 = min(不足額, 運用資産のプラス分)
+            replenish_amount = np.where(
+                should_replenish,
+                np.minimum(cash_deficit, np.maximum(invested_after_return, 0)),
+                0
+            )
+            invested_after_return = invested_after_return - replenish_amount
+            current_cash = current_cash + replenish_amount
+
+        else:
+            # 積立フェーズまたは取崩額0: 従来通り
+            invested_after_return = invested_after_return - actual_withdrawal + pension_schedule[t]
+
+        invested_paths[:, t + 1] = invested_after_return
+        cash_paths[:, t + 1] = current_cash
 
         # 合計資産 = 運用 + 現金
         all_paths[:, t + 1] = invested_paths[:, t + 1] + cash_paths[:, t + 1]

@@ -734,6 +734,47 @@ with st.sidebar:
     st.divider()
 
     # ==========================================================
+    # 🛡️ FIRE出口戦略（キャッシュ・クッション）
+    # ==========================================================
+    section_header("FIRE出口戦略")
+    st.caption("FIRE開始時に生活防衛資金を確保し、暴落時は運用資産の安値売却を回避します。")
+
+    settings["fire_cash_reserve"] = st.number_input(
+        "FIRE時の確保現金額（万円）",
+        min_value=0, max_value=10000,
+        value=int(settings.get("fire_cash_reserve", 1500)),
+        step=100,
+        help="FIRE開始時に現金プールへ強制確保する生活防衛資金。暴落時はこの現金から生活費を取り崩します。",
+    )
+
+    settings["crash_threshold"] = st.slider(
+        "暴落判定のしきい値（%）",
+        min_value=5, max_value=50,
+        value=int(settings.get("crash_threshold", 20)),
+        help="運用資産が直近最高値からこの割合以上下落した場合、暴落中と判定し現金からの取り崩しに切り替えます。",
+    )
+
+    settings["post_fire_return_rate"] = st.number_input(
+        "FIRE後の期待リターン（年率 %）",
+        min_value=0.0, max_value=15.0,
+        value=float(settings.get("post_fire_return_rate", 3.0)),
+        step=0.5,
+        help="リタイア後は保守的な運用になることを想定した、積立期とは別の利回り。",
+    )
+
+    # サマリー表示
+    fire_ym = get_fire_start_ym(settings)
+    if fire_ym[0]:
+        st.info(
+            f"📋 FIRE開始: {fire_ym[0]}/{fire_ym[1]:02d} → "
+            f"現金確保 {settings['fire_cash_reserve']:,}万円 / "
+            f"暴落しきい値 {settings['crash_threshold']}% / "
+            f"FIRE後リターン {settings['post_fire_return_rate']}%"
+        )
+
+    st.divider()
+
+    # ==========================================================
     # 🏛 年金設定
     # ==========================================================
     section_header("年金設定")

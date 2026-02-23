@@ -79,6 +79,9 @@ def get_default_settings():
             },
             "targets": [5000, 10000],
             "sim_count": 5000,
+            "fire_cash_reserve": 1500,
+            "crash_threshold": 20,
+            "post_fire_return_rate": 3.0,
         },
         "actual_data": [],
     }
@@ -139,6 +142,13 @@ def _migrate_to_monthly(data):
         settings["savings"] = []
     if "transfer_to_investment" not in settings:
         settings["transfer_to_investment"] = []
+    # FIRE出口戦略パラメータのデフォルト補完
+    if "fire_cash_reserve" not in settings:
+        settings["fire_cash_reserve"] = 1500
+    if "crash_threshold" not in settings:
+        settings["crash_threshold"] = 20
+    if "post_fire_return_rate" not in settings:
+        settings["post_fire_return_rate"] = 3.0
     return data
 
 
