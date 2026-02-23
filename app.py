@@ -171,8 +171,8 @@ st.markdown("""
     /* タブレット横向き（1024px〜1366px） */
     @media screen and (max-width: 1366px) and (min-width: 768px) {
         section[data-testid="stSidebar"] {
-            min-width: 340px;
-            max-width: 380px;
+            min-width: 400px;
+            max-width: 480px;
         }
         .kpi-card {
             padding: 16px 12px;
@@ -185,8 +185,8 @@ st.markdown("""
     /* タブレット縦向き（768px〜1024px） */
     @media screen and (max-width: 1024px) {
         section[data-testid="stSidebar"] {
-            min-width: 300px;
-            max-width: 340px;
+            min-width: 360px;
+            max-width: 420px;
         }
         .kpi-value {
             font-size: 1.4rem;
