@@ -399,6 +399,29 @@ with st.sidebar:
     total_asset = settings["invested_asset"] + settings["cash_reserve"]
     st.caption(f"合計資産: **{total_asset:,} 万円**（運用 {settings['invested_asset']:,} + 現金 {settings['cash_reserve']:,}）")
 
+    # --- CAGR（実績成長率）の計算 ---
+    actual_data = data.get("actual_data", [])
+    if actual_data and len(actual_data) >= 1:
+        try:
+            oldest = actual_data[0]  # 日付順にソート済み
+            oldest_date = datetime.strptime(oldest["date"], "%Y/%m" if "/" in oldest["date"] else "%Y-%m-%d")
+            oldest_amount = oldest["amount"]
+            
+            if oldest_amount > 0 and total_asset > 0:
+                now = datetime.now()
+                # 経過年数の計算（月単位で算出してから12で割る）
+                months_diff = (now.year - oldest_date.year) * 12 + (now.month - oldest_date.month)
+                years_diff = months_diff / 12.0
+                
+                if years_diff > 0:
+                    cagr = (pow(total_asset / oldest_amount, 1.0 / years_diff) - 1) * 100
+                    st.success(f"これまでの平均成長率 (年利): **{cagr:.2f}%**")
+                    st.caption(f"※ {oldest['date']} の実績 ({oldest_amount:,}万円) からの算出")
+        except Exception:
+            pass  # 計算不能な場合は表示しない
+    elif not actual_data:
+        st.info("過去の資産実績を入力すると、これまでの年平均成長率がここに表示されます。")
+
     st.divider()
 
     # ==========================================================
