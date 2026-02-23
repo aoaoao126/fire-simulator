@@ -186,7 +186,8 @@ def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
             tickfont=dict(size=11, color=DARK_TEXT),
             gridcolor="rgba(0,0,0,0.04)",
             showgrid=True,
-            range=[chart_start_year, chart_end_year],
+            range=[chart_start_year, chart_start_year + 30],
+            fixedrange=False,  # 横方向のスライドを許可
         ),
         yaxis=dict(
             title=dict(text="資産額（万円）", font=dict(size=13, color=DARK_TEXT)),
@@ -195,7 +196,9 @@ def build_chart(results, settings, mode="simple", y_max=30000, start_year=None):
             tickfont=dict(size=11, color=DARK_TEXT),
             gridcolor="rgba(0,0,0,0.06)",
             showgrid=True,
+            fixedrange=True,   # 縦方向は固定（ページスクロールを妨げない）
         ),
+        dragmode="pan",        # 初期状態でスライド操作を有効化
         legend=dict(
             orientation="h",
             yanchor="bottom",

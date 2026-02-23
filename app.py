@@ -953,7 +953,16 @@ if results is not None:
     # --- メイングラフ ---
     actual_data = data.get("actual_data", [])
     fig = build_chart_with_actual(results, settings, actual_data, mode=mode)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True})
+    st.plotly_chart(
+        fig, 
+        use_container_width=True, 
+        config={
+            "scrollZoom": False,
+            "displayModeBar": False,
+            "showAxisDragHandles": False,
+            "responsive": True,
+        }
+    )
 
     # --- 詳細統計（詳細モード） ---
     if mode == "detail":
