@@ -1,8 +1,6 @@
-# -*- coding: utf-8 -*-
+# v3.0 - Build Trigger: 2026-02-25
 """
 個人用FIREモンテカルロシミュレーター
-Streamlitメインアプリケーション
-白基調（Google Blue）デザイン、シンプル/詳細モード対応
 """
 
 import streamlit as st
