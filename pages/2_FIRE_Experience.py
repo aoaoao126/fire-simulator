@@ -209,12 +209,7 @@ def mental_display_inline(status):
     icon = icons.get(status, '😊')
     label = labels.get(status, '')
     cls = css.get(status, 'mental-normal')
-    return f"""
-    <div style="display:flex; align-items:center; gap:6px;">
-        <span style="font-size:2rem;">{icon}</span>
-        <span class="mental-label {cls}" style="margin:0; font-size:0.9rem;">【{label}】</span>
-    </div>
-    """
+    return f'<div style="display:flex; align-items:center; gap:6px;"><span style="font-size:2rem;">{icon}</span><span class="mental-label {cls}" style="margin:0; font-size:0.9rem;">【{label}】</span></div>'
 
 
 # ============================================================
