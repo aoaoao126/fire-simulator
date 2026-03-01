@@ -384,7 +384,31 @@ else:
 
     st.markdown(f"### 📅 {y}年 {m}月（{state['month_index']}ヶ月目）")
 
-    cards = st.columns(5)
+    # --- 月次リターン計算 ---
+    r_pct = current["return_pct"]
+    r_css = "val-green" if r_pct >= 0 else "val-red"
+    # 金額変動: 前月との差分
+    if len(state["history"]) >= 2:
+        prev_total = state["history"][-2]["total"]
+        month_diff = current["total"] - prev_total
+    else:
+        month_diff = 0
+    month_diff_sign = "+" if month_diff >= 0 else ""
+
+    # --- 年間リターン計算 ---
+    mi = state["month_index"]
+    if mi >= 12 and len(state["history"]) > 12:
+        year_ago = state["history"][-13]
+        year_ago_total = year_ago["total"]
+        year_diff = current["total"] - year_ago_total
+        year_pct = (year_diff / year_ago_total * 100) if year_ago_total != 0 else 0
+    else:
+        year_diff = 0
+        year_pct = 0
+    yr_css = "val-green" if year_pct >= 0 else "val-red"
+    yr_diff_sign = "+" if year_diff >= 0 else ""
+
+    cards = st.columns(6)
     with cards[0]:
         st.markdown(info_card("合計資産", f"{current['total']:,.0f}万円",
                               "val-blue" if current["total"] > 0 else "val-red"),
@@ -396,12 +420,22 @@ else:
         st.markdown(info_card("現金プール", f"{current['cash']:,.0f}万円", "val-green"),
                     unsafe_allow_html=True)
     with cards[3]:
-        r_pct = current["return_pct"]
-        r_css = "val-green" if r_pct >= 0 else "val-red"
-        st.markdown(info_card("今月のリターン", f"{r_pct:+.2f}%", r_css),
+        st.markdown(info_card("今月のリターン",
+                              f"{r_pct:+.2f}%<br><small style='font-size:0.85rem;'>{month_diff_sign}{month_diff:,.0f}万円</small>",
+                              r_css),
                     unsafe_allow_html=True)
     with cards[4]:
-        # 経過年数
+        if mi >= 12:
+            st.markdown(info_card("1年間のリターン",
+                                  f"{year_pct:+.1f}%<br><small style='font-size:0.85rem;'>{yr_diff_sign}{year_diff:,.0f}万円</small>",
+                                  yr_css),
+                        unsafe_allow_html=True)
+        else:
+            st.markdown(info_card("1年間のリターン",
+                                  f"<small style='font-size:0.85rem;'>12ヶ月後に表示</small>",
+                                  "val-grey"),
+                        unsafe_allow_html=True)
+    with cards[5]:
         elapsed_years = state["month_index"] / 12
         st.markdown(info_card("経過", f"{elapsed_years:.1f}年", "val-grey"),
                     unsafe_allow_html=True)
@@ -457,7 +491,14 @@ else:
             )
 
         with act_cols[3]:
-            side_hustle = st.button("💼 副業 +10万", use_container_width=True, key="act_hustle")
+            hustle_options = [0, 5, 10, 15, 20, 25, 30, 35, 40]
+            side_hustle_val = st.selectbox(
+                "💼 副業収入（万円）",
+                hustle_options,
+                index=0,
+                key="act_hustle",
+                help="今月の副業収入を追加する",
+            )
 
         # --- 操作ボタン ---
         st.divider()
@@ -476,7 +517,7 @@ else:
             "withdrawal_override": override_expense if override_expense != state["monthly_expense"] else None,
             "source": source,
             "rebalance": rebalance,
-            "side_hustle": 10 if side_hustle else 0,
+            "side_hustle": side_hustle_val,
         }
 
         if step_one:
