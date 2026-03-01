@@ -197,17 +197,23 @@ def info_card(label, value, css_class="val-blue"):
     </div>
     """
 
-def mental_display(status):
+def mental_display_inline(status):
+    """ヘッダー右上に表示するインライン形式のメンタルステータスHTML"""
     icons = {"normal": "😊", "caution": "😐", "panic": "😨"}
     labels = {
-        "normal": "【通常時：余裕】",
-        "caution": "【警戒時：やや不安】",
-        "panic": "【暴落時：パニック寸前】",
+        "normal": "通常時：余裕",
+        "caution": "警戒時：やや不安",
+        "panic": "暴落時：パニック寸前",
     }
     css = {"normal": "mental-normal", "caution": "mental-caution", "panic": "mental-panic"}
+    icon = icons.get(status, '😊')
+    label = labels.get(status, '')
+    cls = css.get(status, 'mental-normal')
     return f"""
-    <div class="mental-status">{icons.get(status, '😊')}</div>
-    <div class="mental-label {css.get(status, 'mental-normal')}">{labels.get(status, '')}</div>
+    <div style="display:flex; align-items:center; gap:6px;">
+        <span style="font-size:2rem;">{icon}</span>
+        <span class="mental-label {cls}" style="margin:0; font-size:0.9rem;">【{label}】</span>
+    </div>
     """
 
 
@@ -314,13 +320,21 @@ with st.sidebar:
 # ============================================================
 # メインエリア
 # ============================================================
-st.markdown("""
-<div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
-    <h1 style="margin:0; color:#3C4043; font-size:1.8rem;">🛡️ FIRE体験シミュレーター</h1>
+flight_state_for_header = st.session_state.flight_state
+_mental_html = ""
+if flight_state_for_header is not None:
+    _mental_html = mental_display_inline(flight_state_for_header["mental_status"])
+
+st.markdown(f"""
+<div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:0;">
+    <div>
+        <h1 style="margin:0; color:#3C4043; font-size:1.8rem;">🛡️ FIRE体験シミュレーター</h1>
+        <p style="color:#5F6368; font-size:0.95rem; margin:4px 0 16px 0;">
+            1万通りの未来からランダムに選ばれた「たった1つの過酷な現実」を生き抜く
+        </p>
+    </div>
+    {_mental_html}
 </div>
-<p style="color:#5F6368; font-size:0.95rem; margin-bottom:16px;">
-    1万通りの未来からランダムに選ばれた「たった1つの過酷な現実」を生き抜く
-</p>
 """, unsafe_allow_html=True)
 
 flight_state = st.session_state.flight_state
@@ -365,12 +379,7 @@ else:
     # --- シミュレーション進行中 or 完了 ---
     state = flight_state
 
-    # ========================================
-    # メンタルステータス表示
-    # ========================================
-    status_cols = st.columns([1, 2, 1])
-    with status_cols[1]:
-        st.markdown(mental_display(state["mental_status"]), unsafe_allow_html=True)
+    # メンタルステータスはヘッダー右上に統合済み
 
     # ========================================
     # 現在の状況カード
