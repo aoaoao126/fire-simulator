@@ -274,7 +274,10 @@ def step_month(state, user_action=None):
     if user_action and any(v for k, v in user_action.items() if v):
         parts = []
         if user_action.get("withdrawal_override") is not None:
-            parts.append(f"取崩変更: {withdrawal}万円")
+            if user_action.get("withdrawal_is_pct") and user_action.get("withdrawal_pct") is not None:
+                parts.append(f"取崩変更: {withdrawal}万円（{user_action['withdrawal_pct']:.1f}%）")
+            else:
+                parts.append(f"取崩変更: {withdrawal}万円")
         if user_action.get("source") and user_action["source"] != "auto":
             parts.append(f"取崩元: {'現金' if source == 'cash' else '運用'}")
         if rebalance != 0:

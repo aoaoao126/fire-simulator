@@ -162,6 +162,15 @@ st.markdown("""
         }
     }
 
+    /* ラジオボタン選択済みの太字化 */
+    div[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child + div {
+        font-weight: 400;
+    }
+    div[data-testid="stRadio"] label[data-baseweb="radio"][aria-checked="true"] > div:first-child + div,
+    div[data-testid="stRadio"] input[type="radio"]:checked + div + div {
+        font-weight: 700 !important;
+    }
+
     /* レスポンシブ */
     @media screen and (max-width: 1024px) {
         .info-value { font-size: 1.3rem; }
@@ -461,22 +470,44 @@ else:
         st.divider()
         section_header("介入アクション（任意）")
 
-        act_cols = st.columns([2, 2, 2, 1.5])
+        act_cols = st.columns([2.5, 2, 2, 1.5])
 
         with act_cols[0]:
-            override_expense = st.number_input(
-                "今月の取り崩し額（万円）",
-                min_value=0, max_value=500,
-                value=state["monthly_expense"],
-                step=1, key="act_expense",
-                help="通常より節約または増額する",
+            expense_unit = st.radio(
+                "取り崩し単位",
+                ["万円", "％"],
+                horizontal=True,
+                key="act_expense_unit",
+                label_visibility="collapsed",
             )
+            if expense_unit == "万円":
+                override_expense = st.number_input(
+                    "今月の取り崩し額（万円）",
+                    min_value=0, max_value=500,
+                    value=state["monthly_expense"],
+                    step=1, key="act_expense",
+                    help="通常より節約または増額する",
+                )
+                override_expense_yen = override_expense
+            else:
+                override_pct = st.number_input(
+                    "今月の取り崩し率（％）",
+                    min_value=0.0, max_value=10.0,
+                    value=0.3, step=0.1, format="%.1f",
+                    key="act_expense_pct",
+                    help="運用資産に対する割合で取り崩し",
+                )
+                # 運用資産額から万円に変換
+                current_invested = state["history"][-1]["invested"]
+                override_expense_yen = round(current_invested * override_pct / 100.0)
+                st.caption(f"≒ {override_expense_yen:,}万円（運用資産 {current_invested:,.0f}万円の{override_pct:.1f}%）")
 
         with act_cols[1]:
             source_options = {"自動判定": "auto", "運用資産から": "invested", "現金から": "cash"}
-            source_label = st.selectbox(
+            source_label = st.radio(
                 "取り崩し元",
                 list(source_options.keys()),
+                horizontal=True,
                 key="act_source",
                 help="暴落時は現金から出すのが基本戦略",
             )
@@ -514,7 +545,9 @@ else:
 
         # --- アクション実行 ---
         user_action = {
-            "withdrawal_override": override_expense if override_expense != state["monthly_expense"] else None,
+            "withdrawal_override": override_expense_yen if override_expense_yen != state["monthly_expense"] else None,
+            "withdrawal_is_pct": expense_unit == "％",
+            "withdrawal_pct": override_pct if expense_unit == "％" else None,
             "source": source,
             "rebalance": rebalance,
             "side_hustle": side_hustle_val,
