@@ -416,41 +416,9 @@ else:
                     unsafe_allow_html=True)
 
     # ========================================
-    # グラフ
-    # ========================================
-    if state["status"] == "running":
-        fig = build_flight_chart(state, main_settings)
-    else:
-        fig = build_comparison_chart(state, main_settings)
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-        config={
-            "scrollZoom": False,
-            "displayModeBar": False,
-            "showAxisDragHandles": False,
-            "responsive": True,
-        }
-    )
-
-    # ========================================
     # 操作パネル（実行中のみ）
     # ========================================
     if state["status"] == "running":
-        st.divider()
-
-        # --- 操作ボタン ---
-        btn_cols = st.columns(4)
-        with btn_cols[0]:
-            step_one = st.button("▶ 1ヶ月進む", use_container_width=True, type="primary")
-        with btn_cols[1]:
-            skip_btn = st.button("⏩ 次のイベントまで", use_container_width=True)
-        with btn_cols[2]:
-            st.empty()
-        with btn_cols[3]:
-            reset_btn = st.button("🔄 リセット", use_container_width=True)
-
         # --- 介入アクション ---
         st.divider()
         section_header("介入アクション（任意）")
@@ -487,6 +455,18 @@ else:
         with act_cols[3]:
             side_hustle = st.button("💼 副業 +10万", use_container_width=True, key="act_hustle")
 
+        # --- 操作ボタン ---
+        st.divider()
+        btn_cols = st.columns(4)
+        with btn_cols[0]:
+            step_one = st.button("▶ 1ヶ月進む", use_container_width=True, type="primary")
+        with btn_cols[1]:
+            skip_btn = st.button("⏩ 次のイベントまで", use_container_width=True)
+        with btn_cols[2]:
+            st.empty()
+        with btn_cols[3]:
+            reset_btn = st.button("🔄 リセット", use_container_width=True)
+
         # --- アクション実行 ---
         user_action = {
             "withdrawal_override": override_expense if override_expense != state["monthly_expense"] else None,
@@ -509,7 +489,27 @@ else:
             st.session_state.flight_state = None
             st.rerun()
 
+    # ========================================
+    # グラフ（実行中・完了時共通）
+    # ========================================
+    st.divider()
+    if state["status"] == "running":
+        fig = build_flight_chart(state, main_settings)
     else:
+        fig = build_comparison_chart(state, main_settings)
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={
+            "scrollZoom": False,
+            "displayModeBar": False,
+            "showAxisDragHandles": False,
+            "responsive": True,
+        }
+    )
+
+    if state["status"] != "running":
         # ========================================
         # 結果表示
         # ========================================
