@@ -93,23 +93,35 @@ def build_flight_chart(state, settings, y_max=30000):
         ))
 
     # --- ライフイベント縦線 ---
+    x_labels_set = set(x_labels)
     for evt in state.get("life_events", []):
         evt_idx = evt["month_index"]
-        # 履歴に含まれている場合のみ表示（将来のイベントも点線で表示）
         evt_year = evt["year"]
         evt_month = evt["month"]
         evt_label_x = f"{evt_year}/{evt_month:02d}"
+
+        # 履歴に含まれている場合のみ表示（X軸に存在しないラベルはスキップ）
+        if evt_label_x not in x_labels_set:
+            continue
 
         # 色の決定
         stage = evt["label"].split()[-1].replace("入学", "") if "入学" in evt["label"] else ""
         color = EVENT_COLORS.get(stage, "#5F6368")
 
-        fig.add_vline(
-            x=evt_label_x,
+        fig.add_shape(
+            type="line",
+            x0=evt_label_x, x1=evt_label_x,
+            y0=0, y1=1,
+            xref="x", yref="paper",
             line=dict(color=color, width=1.5, dash="dot"),
-            annotation_text=evt["label"],
-            annotation_position="top",
-            annotation=dict(font_size=10, font_color=color),
+        )
+        fig.add_annotation(
+            x=evt_label_x, y=1,
+            xref="x", yref="paper",
+            text=evt["label"],
+            showarrow=False,
+            font=dict(size=10, color=color),
+            yshift=10,
         )
 
     # --- 暴落ゾーンのハイライト ---
@@ -268,15 +280,24 @@ def _add_crash_zones(fig, history, state):
             crash_start = f"{h['year']}/{h['month']:02d}"
         elif drawdown < crash_threshold and in_crash:
             in_crash = False
-            fig.add_vrect(
-                x0=crash_start,
-                x1=f"{h['year']}/{h['month']:02d}",
+            crash_end = f"{h['year']}/{h['month']:02d}"
+            fig.add_shape(
+                type="rect",
+                x0=crash_start, x1=crash_end,
+                y0=0, y1=1,
+                xref="x", yref="paper",
                 fillcolor=CRASH_ZONE_COLOR,
                 layer="below",
                 line_width=0,
-                annotation_text="暴落期間",
-                annotation_position="top left",
-                annotation=dict(font_size=9, font_color="#EA4335"),
+            )
+            fig.add_annotation(
+                x=crash_start, y=1,
+                xref="x", yref="paper",
+                text="暴落期間",
+                showarrow=False,
+                font=dict(size=9, color="#EA4335"),
+                xanchor="left",
+                yshift=10,
             )
 
 
