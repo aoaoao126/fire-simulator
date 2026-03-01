@@ -45,12 +45,36 @@ def generate_scenario(settings):
     post_fire_vol = fs.get("post_fire_vol", 12.0) / 100.0
     sim_years = fs.get("sim_years", 40)
 
+    # --- 1万本のリターン配列を生成（株式/債券合成） ---
+    # 株式/債券アロケーション
+    stock_ratio = fs.get("stock_ratio", 60) / 100.0
+    bond_ratio_val = 1.0 - stock_ratio
+
+    # 株式パラメータ
+    stock_annual_return = post_fire_return
+    stock_annual_vol = post_fire_vol
+
+    # 債券パラメータ
+    bond_annual_return = 0.015  # 年率 1.5%
+    bond_annual_vol = 0.03      # 年率 3%
+
+    # 相関係数（株式と債券の逆相関）
+    rho = -0.2
+
+    # 合成リターン（月率）
+    portfolio_annual_return = stock_ratio * stock_annual_return + bond_ratio_val * bond_annual_return
+    monthly_return = portfolio_annual_return / 12.0
+
+    # 合成ボラティリティ（月率）
+    portfolio_annual_vol = np.sqrt(
+        stock_ratio**2 * stock_annual_vol**2
+        + bond_ratio_val**2 * bond_annual_vol**2
+        + 2 * stock_ratio * bond_ratio_val * rho * stock_annual_vol * bond_annual_vol
+    )
+    monthly_vol = portfolio_annual_vol / np.sqrt(12.0)
+
     n_months = sim_years * 12
     n_sim = 10000
-
-    # 月率に変換
-    monthly_return = post_fire_return / 12.0
-    monthly_vol = post_fire_vol / np.sqrt(12.0)
 
     # --- 月次軸の構築 ---
     months_axis = []
@@ -91,6 +115,10 @@ def generate_scenario(settings):
         "defense_fund": defense_fund,
         "volatility_threshold": volatility_threshold,
         "crash_threshold": fs.get("crash_threshold", 20) / 100.0,
+        "stock_ratio": stock_ratio,           # 現在の株式比率
+        "target_stock_ratio": stock_ratio,     # 目標株式比率
+        "rebalance_suggested": False,           # リバランス提案フラグ
+        "current_stock_pct": stock_ratio * 100, # 表示用（%）
         "history": [{
             "month_index": 0,
             "year": months_axis[0][0],
@@ -261,6 +289,42 @@ def step_month(state, user_action=None):
     # --- 直近最高値の更新 ---
     new_peak = max(state["peak_invested"], invested_after_return)
 
+    # --- 株式比率の推定とリバランス提案 ---
+    # 運用資産内の株式比率をリターンに基づき推定
+    # 株式が上がると比率が上がる，下がると下がる
+    target_ratio = state["target_stock_ratio"]
+    if invested_after_return > 0 and state.get("invested", 0) > 0:
+        # 前月の株式部分と債券部分を推定
+        prev_stock = state.get("invested", 0) * state["stock_ratio"]
+        prev_bond = state.get("invested", 0) * (1.0 - state["stock_ratio"])
+        # 株式は r_t で変動、債券は安定的に変動（簡易推定）
+        est_stock = prev_stock * (1 + r_t)
+        est_bond = prev_bond * (1 + 0.015 / 12.0)  # 債券リターン月率
+        est_total_inv = est_stock + est_bond
+        if est_total_inv > 0:
+            current_stock_ratio = est_stock / est_total_inv
+        else:
+            current_stock_ratio = target_ratio
+    else:
+        current_stock_ratio = target_ratio
+
+    state["stock_ratio"] = current_stock_ratio
+    state["current_stock_pct"] = current_stock_ratio * 100
+
+    # リバランス提案: 目標から±5%以上ズレたら提案
+    if abs(current_stock_ratio - target_ratio) >= 0.05:
+        state["rebalance_suggested"] = True
+    else:
+        state["rebalance_suggested"] = False
+
+    # ユーザーがリバランスを実行した場合
+    did_rebalance = False
+    if user_action.get("do_rebalance"):
+        state["stock_ratio"] = target_ratio
+        state["current_stock_pct"] = target_ratio * 100
+        state["rebalance_suggested"] = False
+        did_rebalance = True
+
     # --- 状態更新 ---
     new_total = invested_after_return + cash
 
@@ -284,6 +348,8 @@ def step_month(state, user_action=None):
             parts.append(f"リバランス: {rebalance:+.0f}万円")
         if side_hustle > 0:
             parts.append(f"副業: +{side_hustle}万円")
+        if did_rebalance:
+            parts.append("🔄 リバランス実行")
         action_desc = " / ".join(parts) if parts else None
 
     state["history"].append({

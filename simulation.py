@@ -220,18 +220,42 @@ def run_simulation(settings, current_year=None, current_month=None):
     # 月次リターンを一括生成
     random_returns = np.random.normal(monthly_return, monthly_vol, (n_sim, n_months))
 
-    # FIRE後リターンの切り替え: FIRE開始月以降は別のリターン・ボラティリティを適用
+    # FIRE後リターンの切り替え: FIRE開始月以降は株式/債券の合成リターンを適用
     if fire_start_month_idx is not None and fire_start_month_idx < n_months:
-        post_fire_monthly_return = post_fire_return / 12.0
-        # ボラティリティはリターン比に応じてスケーリング（保守的運用を反映）
+        # --- 株式/債券のアロケーション ---
+        stock_ratio = settings.get("stock_ratio", 60) / 100.0
+        bond_ratio = 1.0 - stock_ratio
+
+        # 株式パラメータ（FIRE後）
+        stock_annual_return = post_fire_return  # 既に小数
         if annual_return > 0:
             vol_scale = post_fire_return / annual_return
         else:
             vol_scale = 1.0
-        post_fire_monthly_vol = monthly_vol * vol_scale
+        stock_annual_vol = annual_vol * vol_scale
+
+        # 債券パラメータ
+        bond_annual_return = 0.015  # 年率 1.5%
+        bond_annual_vol = 0.03      # 年率 3%
+
+        # 相関係数（株式と債券の逆相関）
+        rho = -0.2
+
+        # 合成リターン（月率）
+        portfolio_monthly_return = (stock_ratio * stock_annual_return + bond_ratio * bond_annual_return) / 12.0
+
+        # 合成ボラティリティ（月率）
+        portfolio_annual_vol = np.sqrt(
+            stock_ratio**2 * stock_annual_vol**2
+            + bond_ratio**2 * bond_annual_vol**2
+            + 2 * stock_ratio * bond_ratio * rho * stock_annual_vol * bond_annual_vol
+        )
+        portfolio_monthly_vol = portfolio_annual_vol / np.sqrt(12.0)
+
+        n_fire_months = n_months - fire_start_month_idx
         random_returns[:, fire_start_month_idx:] = np.random.normal(
-            post_fire_monthly_return, post_fire_monthly_vol,
-            (n_sim, n_months - fire_start_month_idx)
+            portfolio_monthly_return, portfolio_monthly_vol,
+            (n_sim, n_fire_months)
         )
 
     # 暴落の適用

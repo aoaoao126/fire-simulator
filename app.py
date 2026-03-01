@@ -757,8 +757,18 @@ with st.sidebar:
         min_value=0.0, max_value=15.0,
         value=float(settings.get("post_fire_return_rate", 3.0)),
         step=0.5,
-        help="リタイア後は保守的な運用になることを想定した、積立期とは別の利回り。",
+        help="リタイア後の株式部分の期待リターン。債券部分は別途1.5%で計算されます。",
     )
+
+    settings["stock_ratio"] = st.slider(
+        "株式比率（%）",
+        min_value=0, max_value=100,
+        value=int(settings.get("stock_ratio", 60)),
+        step=5,
+        help="FIRE後のポートフォリオにおける株式の割合。残りは債券（リターン1.5%/ボラ3%）として計算されます。",
+    )
+    bond_ratio = 100 - settings["stock_ratio"]
+    st.caption(f"📊 株式 {settings['stock_ratio']}% / 債券 {bond_ratio}%　（債券: リターン1.5%, ボラ3%）")
 
     # サマリー表示
     fire_ym = get_fire_start_ym(settings)
@@ -767,7 +777,8 @@ with st.sidebar:
             f"📋 FIRE開始: {fire_ym[0]}/{fire_ym[1]:02d} → "
             f"現金確保 {settings['fire_cash_reserve']:,}万円 / "
             f"暴落しきい値 {settings['crash_threshold']}% / "
-            f"FIRE後リターン {settings['post_fire_return_rate']}%"
+            f"FIRE後リターン {settings['post_fire_return_rate']}% / "
+            f"株式比率 {settings['stock_ratio']}%"
         )
 
     st.divider()

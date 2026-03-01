@@ -273,6 +273,18 @@ with st.sidebar:
     )
 
     st.divider()
+    section_header("ポートフォリオ")
+
+    fs_stock_ratio = st.slider(
+        "株式比率（%）",
+        min_value=0, max_value=100,
+        value=int(main_settings.get("stock_ratio", 60)),
+        step=5, key="fs_stock_ratio",
+        help="運用資産における株式の割合。残りは債券（リターン1.5%/ボラ3%）",
+    )
+    st.caption(f"📊 株式 {fs_stock_ratio}% / 債券 {100-fs_stock_ratio}%")
+
+    st.divider()
     section_header("生活設定")
 
     fs_expense = st.number_input(
@@ -370,6 +382,7 @@ if flight_state is None:
                 "post_fire_return": fs_return,
                 "post_fire_vol": fs_vol,
                 "sim_years": fs_years,
+                "stock_ratio": fs_stock_ratio,
             },
             "family": family,
             "market": main_settings.get("market", {}),
@@ -417,7 +430,7 @@ else:
     yr_css = "val-green" if year_pct >= 0 else "val-red"
     yr_diff_sign = "+" if year_diff >= 0 else ""
 
-    cards = st.columns(6)
+    cards = st.columns(7)
     with cards[0]:
         st.markdown(info_card("合計資産", f"{current['total']:,.0f}万円",
                               "val-blue" if current["total"] > 0 else "val-red"),
@@ -445,6 +458,14 @@ else:
                                   "val-grey"),
                         unsafe_allow_html=True)
     with cards[5]:
+        # 株式/債券比率表示
+        stock_pct = state.get("current_stock_pct", 60)
+        bond_pct = 100 - stock_pct
+        st.markdown(info_card("株/債比率",
+                              f"<small style='font-size:0.85rem;'>株{stock_pct:.0f}% / 債{bond_pct:.0f}%</small>",
+                              "val-blue"),
+                    unsafe_allow_html=True)
+    with cards[6]:
         elapsed_years = state["month_index"] / 12
         st.markdown(info_card("経過", f"{elapsed_years:.1f}年", "val-grey"),
                     unsafe_allow_html=True)
@@ -466,6 +487,21 @@ else:
     # 操作パネル（実行中のみ）
     # ========================================
     if state["status"] == "running":
+        # --- リバランス提案 ---
+        if state.get("rebalance_suggested"):
+            target_pct = state.get("target_stock_ratio", 0.6) * 100
+            current_pct = state.get("current_stock_pct", 60)
+            direction = "株式が增えすぎ" if current_pct > target_pct else "債券が增えすぎ"
+            st.markdown(
+                f'<div class="event-alert">🔄 <strong>リバランス提案:</strong> '
+                f'{direction}ています（現在 株{current_pct:.0f}% / 目標 株{target_pct:.0f}%）'
+                f'。株を売って守りを固めますか？</div>',
+                unsafe_allow_html=True,
+            )
+            do_rebalance_btn = st.button("🔄 リバランスを実行する", key="btn_rebalance")
+        else:
+            do_rebalance_btn = False
+
         # --- 介入アクション ---
         st.divider()
         section_header("介入アクション（任意）")
@@ -551,6 +587,7 @@ else:
             "source": source,
             "rebalance": rebalance,
             "side_hustle": side_hustle_val,
+            "do_rebalance": do_rebalance_btn,
         }
 
         if step_one:
